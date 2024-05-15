@@ -1,0 +1,3 @@
+[submodule "lib/bonding-curve"]
+	path = lib/bonding-curve
+	url = https://github.com/relevant-community/bonding-curve
