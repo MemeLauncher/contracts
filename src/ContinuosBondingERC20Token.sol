@@ -54,7 +54,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     buyFee = _buyFee;
     sellFee = _sellFee;
     bondingCurve = _bondingCurve;
-    _mint(address(0), 1000);
+    _mint(BURN_ADDRESS, 1000);
   }
 
   function buyTokens() external payable {
