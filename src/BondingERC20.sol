@@ -22,6 +22,14 @@ error FailedToSendETH();
 // ?)
 // 7. LP tokens should be burned after pair creation (or kept in the token contract).
 
+// QUESTION
+// what should be max supply number
+// Once liquidity goal is reached, the remanining supply is minted and added to the LP. (I think we shouldn't mint remaining suppy because that will dilute too much)
+// what would happen if liquidity goal is not reached and there is ether in the contract? who owns that ether?
+// should we add cooldown for existing holders when LP is created. 
+// lp tokens shouldn't be burned because that will make LP share very valuable. should keep in token contract
+// how to mitigate front running
+
 contract BondingERC20Token is ERC20, Ownable, ReentrancyGuard {
     IUniswapV2Router02 public immutable router;
     IUniswapV2Factory public immutable factory;
@@ -32,7 +40,7 @@ contract BondingERC20Token is ERC20, Ownable, ReentrancyGuard {
     uint256 public constant INITIAL_PRICE = 1e12; // Initial price per token
     uint256 public constant PRICE_FACTOR = 1e6; // Price factor for logarithmic curve
     uint256 public totalETHContributed;
-    uint256 public constant liquidityGoal = 10 ether;
+    uint256 public constant liquidityGoal = 400 ether; //400 avax
 
     constructor(
         address _owner,
