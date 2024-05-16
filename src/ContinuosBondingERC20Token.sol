@@ -70,7 +70,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       totalSupply(),
       totalETHContributed,
       uint32(RESERVE_RATIO),
-      remainingAmount
+      remainingAmount,
+      bytes("")
     );
     _mint(msg.sender, tokenBought);
     totalETHContributed += ethAmount;
@@ -89,7 +90,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       totalSupply(),
       totalETHContributed,
       uint32(RESERVE_RATIO),
-      tokenAmount
+      tokenAmount,
+      bytes("")
     );
     if (address(this).balance < reimburseAmount) revert ContractNotEnoughETH();
 
@@ -107,11 +109,17 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   }
 
   function calculateTokenAmount(uint256 ethAmount) public view returns (uint256) {
-    bondingCurve.calculatePurchaseReturn(totalSupply(), totalETHContributed, uint32(RESERVE_RATIO), ethAmount);
+    bondingCurve.calculatePurchaseReturn(
+      totalSupply(),
+      totalETHContributed,
+      uint32(RESERVE_RATIO),
+      ethAmount,
+      bytes("")
+    );
   }
 
   function calculateETHAmount(uint256 tokenAmount) public view returns (uint256) {
-    bondingCurve.calculateSaleReturn(totalSupply(), totalETHContributed, uint32(RESERVE_RATIO), tokenAmount);
+    bondingCurve.calculateSaleReturn(totalSupply(), totalETHContributed, uint32(RESERVE_RATIO), tokenAmount, bytes(""));
   }
 
   function claimTreasuryBalance(address to, uint256 amount) public {
