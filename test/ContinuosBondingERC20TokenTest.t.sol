@@ -52,6 +52,24 @@ contract ContinuosBondingERC20TokenTest is Test {
     assertEq(ethUserShouldGet, 99 ether - 1 wei); // 1 wei stays in the contract because curve started from 1 wei when totalEthContributed was 0
   }
 
+  function testCanBuyTokenTillLiquidityGoal() public {
+    vm.deal(user, 1000 ether);
+    vm.startPrank(user);
+
+    vm.expectRevert();
+    bondingERC20Token.buyTokens{ value: 500 ether }();
+
+    bondingERC20Token.buyTokens{ value: 400 ether }(); //liquidity goal will be 396 ether now.
+
+    vm.expectRevert();
+    bondingERC20Token.buyTokens{ value: 4.5 ether }();
+
+    vm.expectRevert();
+    bondingERC20Token.buyTokens{ value: 4.05 ether }();
+
+    bondingERC20Token.buyTokens{ value: 4.04 ether }();
+  }
+
   function testCanSellToken() public {
     testCanBuyToken();
 
