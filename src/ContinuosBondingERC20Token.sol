@@ -68,13 +68,13 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     treasuryClaimableETH += feeAmount;
     uint256 tokenBought = bondingCurve.calculatePurchaseReturn(
       totalSupply(),
-      totalETHContributed,
+      totalETHContributed == 0 ? 1 : totalETHContributed, //not keeping it 0 due to bonding curve math
       uint32(RESERVE_RATIO),
       remainingAmount,
       bytes("")
     );
     _mint(msg.sender, tokenBought);
-    totalETHContributed += ethAmount;
+    totalETHContributed += remainingAmount;
     if (totalETHContributed == liquidityGoal) {
       _createPair();
     } else if (totalETHContributed > liquidityGoal) {
@@ -96,6 +96,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     if (address(this).balance < reimburseAmount) revert ContractNotEnoughETH();
 
     uint256 feeAmount = (reimburseAmount * sellFee) / PERCENTAGE_DENOMINATOR;
+    totalETHContributed -= reimburseAmount;
     reimburseAmount -= feeAmount;
     treasuryClaimableETH += feeAmount;
 
@@ -109,17 +110,25 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   }
 
   function calculateTokenAmount(uint256 ethAmount) public view returns (uint256) {
-    bondingCurve.calculatePurchaseReturn(
-      totalSupply(),
-      totalETHContributed,
-      uint32(RESERVE_RATIO),
-      ethAmount,
-      bytes("")
-    );
+    return
+      bondingCurve.calculatePurchaseReturn(
+        totalSupply(),
+        totalETHContributed,
+        uint32(RESERVE_RATIO),
+        ethAmount,
+        bytes("")
+      );
   }
 
   function calculateETHAmount(uint256 tokenAmount) public view returns (uint256) {
-    bondingCurve.calculateSaleReturn(totalSupply(), totalETHContributed, uint32(RESERVE_RATIO), tokenAmount, bytes(""));
+    return
+      bondingCurve.calculateSaleReturn(
+        totalSupply(),
+        totalETHContributed,
+        uint32(RESERVE_RATIO),
+        tokenAmount,
+        bytes("")
+      );
   }
 
   function claimTreasuryBalance(address to, uint256 amount) public {
