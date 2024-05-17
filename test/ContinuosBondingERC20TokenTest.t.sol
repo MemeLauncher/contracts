@@ -71,7 +71,7 @@ contract ContinuosBondingERC20TokenTest is Test {
   }
 
   function testPriceIncreasesAfterEachBuy() public {
-    uint256 amount = 200 ether;
+    uint256 amount = 400 ether;
     uint256 halfAmount = amount / 2;
 
     vm.deal(user, amount);
@@ -88,7 +88,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     console2.log(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
     assertGt(receivedAfterFirstBuy, receivedAfterSecondBuy);
     assertGt(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
-    // console2.log(bondingCurve.calculastePurchaseReturn(0, 0, 1e6, 1000, bytes("")));
+    console2.log(bondingERC20Token.totalSupply());
   }
 
   function testCanSellToken() public {
