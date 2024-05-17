@@ -59,15 +59,36 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.expectRevert();
     bondingERC20Token.buyTokens{ value: 500 ether }();
 
-    bondingERC20Token.buyTokens{ value: 400 ether }(); //liquidity goal will be 396 ether now.
+    bondingERC20Token.buyTokens{ value: 400 ether }(); //liquidity goal will be (0.99 * 400 = 396) ether now.
 
     vm.expectRevert();
-    bondingERC20Token.buyTokens{ value: 4.5 ether }();
+    bondingERC20Token.buyTokens{ value: 4.5 ether }(); //liquidity goal will be (396 + 0.99 * 4.5 = 400.455) ether now. hence, will revert as exceeded liquidity goal
 
     vm.expectRevert();
-    bondingERC20Token.buyTokens{ value: 4.05 ether }();
+    bondingERC20Token.buyTokens{ value: 4.05 ether }(); //liquidity goal will be (396 + 0.99 * 4.05 = 400.0095) ether now. hence, will revert as exceeded liquidity goal
 
-    bondingERC20Token.buyTokens{ value: 4.04 ether }();
+    bondingERC20Token.buyTokens{ value: 4.04 ether }(); //liquidity goal will be (396 + 0.99 * 4.04 = 399.9996) ether now.
+  }
+
+  function testPriceIncreasesAfterEachBuy() public {
+    uint256 amount = 200 ether;
+    uint256 halfAmount = amount / 2;
+
+    vm.deal(user, amount);
+    vm.startPrank(user);
+
+    uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
+    bondingERC20Token.buyTokens{ value: halfAmount }();
+    uint256 receivedAfterFirstBuy = bondingERC20Token.balanceOf(user);
+    uint256 tokenPerWeiForFirstBuy = (receivedAfterFirstBuy * 1e18) / halfAmount;
+
+    bondingERC20Token.buyTokens{ value: halfAmount }();
+    uint256 receivedAfterSecondBuy = bondingERC20Token.balanceOf(user) - receivedAfterFirstBuy;
+    uint256 tokenPerWeiForSecondBuy = (receivedAfterSecondBuy * 1e18) / halfAmount;
+    console2.log(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
+    assertGt(receivedAfterFirstBuy, receivedAfterSecondBuy);
+    assertGt(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
+    // console2.log(bondingCurve.calculastePurchaseReturn(0, 0, 1e6, 1000, bytes("")));
   }
 
   function testCanSellToken() public {

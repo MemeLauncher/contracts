@@ -30,10 +30,10 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   address public immutable WETH;
   address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
   address public immutable TREASURY_ADDRESS;
-  uint256 public constant RESERVE_RATIO = 1e6; // Price factor for logarithmic curve
+  uint256 public constant RESERVE_RATIO = 333333; // Price factor for logarithmic curve
   uint256 public constant liquidityGoal = 400 ether; //400 avax
   uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
-  uint256 public totalETHContributed;
+  uint256 public totalETHContributed = 1 * 1e14;
   uint256 public treasuryClaimableETH;
   uint256 public buyFee;
   uint256 public sellFee;
@@ -54,7 +54,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     buyFee = _buyFee;
     sellFee = _sellFee;
     bondingCurve = _bondingCurve;
-    _mint(BURN_ADDRESS, 1000);
+    _mint(BURN_ADDRESS, 10 * 1e18);
   }
 
   function buyTokens() external payable {
