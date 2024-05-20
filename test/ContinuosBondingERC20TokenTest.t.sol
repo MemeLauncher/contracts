@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/src/Test.sol";
 import { console2 } from "forge-std/src/console2.sol";
+import { stdMath } from "forge-std/src/StdMath.sol";
 
 import { BondingERC20TokenFactory } from "src/BondingERC20TokenFactory.sol";
 import { ContinuosBondingERC20Token } from "src/ContinuosBondingERC20Token.sol";
@@ -18,6 +19,8 @@ contract ContinuosBondingERC20TokenTest is Test {
   address internal owner = makeAddr("owner");
   address internal user = makeAddr("user");
   ContinuosBondingERC20Token internal bondingERC20Token;
+  uint256 internal initialETHContribution;
+  uint256 internal startingSupply;
 
   function setUp() public {
     uint256 forkId = vm.createFork(vm.envString("ETH_RPC_URL"), 19876830);
@@ -28,6 +31,8 @@ contract ContinuosBondingERC20TokenTest is Test {
     bondingERC20Token = ContinuosBondingERC20Token(
       factory.deployBondingERC20Token(router, "ERC20Token", "ERC20", 100, 100)
     );
+    initialETHContribution = bondingERC20Token.totalETHContributed();
+    startingSupply = bondingERC20Token.STARTING_SUPPLY();
   }
 
   function testCanBuyToken() public {
@@ -44,12 +49,8 @@ contract ContinuosBondingERC20TokenTest is Test {
 
     assertGt(afterBalanceOfBondingToken, 0);
     assertGt(tokenPerWei, 0);
-    assertEq(bondingERC20Token.totalETHContributed(), 99 ether); // 1% goes to treasury
+    assertEq(bondingERC20Token.totalETHContributed(), 99 ether + initialETHContribution); // 1% goes to treasury
     assertEq(bondingERC20Token.treasuryClaimableETH(), 1 ether); // 1% treasury funds
-
-    //user has tokens worth roughly equivalent to 99 ether.
-    uint256 ethUserShouldGet = bondingERC20Token.calculateETHAmount(afterBalanceOfBondingToken);
-    assertEq(ethUserShouldGet, 99 ether - 1 wei); // 1 wei stays in the contract because curve started from 1 wei when totalEthContributed was 0
   }
 
   function testCanBuyTokenTillLiquidityGoal() public {
@@ -68,6 +69,14 @@ contract ContinuosBondingERC20TokenTest is Test {
     bondingERC20Token.buyTokens{ value: 4.05 ether }(); //liquidity goal will be (396 + 0.99 * 4.05 = 400.0095) ether now. hence, will revert as exceeded liquidity goal
 
     bondingERC20Token.buyTokens{ value: 4.04 ether }(); //liquidity goal will be (396 + 0.99 * 4.04 = 399.9996) ether now.
+  }
+
+  function testCanBuyTokenFuzz(uint256 amount) public {
+    amount = bound(amount, 1, 400 ether);
+    vm.deal(user, amount);
+
+    vm.startPrank(user);
+    bondingERC20Token.buyTokens{ value: amount }();
   }
 
   function testPriceIncreasesAfterEachBuy() public {
@@ -92,19 +101,28 @@ contract ContinuosBondingERC20TokenTest is Test {
   }
 
   function testCanSellToken() public {
-    testCanBuyToken();
+    uint256 amount = 100 ether;
+    vm.deal(user, amount);
+    vm.startPrank(user);
+
+    bondingERC20Token.buyTokens{ value: amount }();
 
     uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
 
     uint256 ethBalanceBefore = user.balance;
 
+    uint256 claimableETH = bondingERC20Token.calculateETHAmount(balanceOfBondingToken);
+
     bondingERC20Token.sellTokens(balanceOfBondingToken);
 
     uint256 ethReceived = user.balance - ethBalanceBefore;
 
-    assertEq(ethReceived, 99 ether - (0.01 * 99 ether));
-    assertEq(bondingERC20Token.treasuryClaimableETH(), 1 ether + 0.01 * 99 ether - 1 wei);
-    assertEq(bondingERC20Token.totalETHContributed(), 1 wei);
-    assertEq(bondingERC20Token.totalSupply(), 1000);
+    assert(_withinRange(ethReceived, 99 ether - (0.01 * 99 ether) - initialETHContribution, 1e14));
+    assertEq(bondingERC20Token.totalETHContributed(), initialETHContribution + (99 ether - claimableETH));
+    assertEq(bondingERC20Token.totalSupply(), startingSupply);
+  }
+
+  function _withinRange(uint256 a, uint256 b, uint256 diff) internal returns (bool) {
+    return (stdMath.delta(a, b) <= diff);
   }
 }

@@ -33,6 +33,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   uint256 public constant RESERVE_RATIO = 333333; // Price factor for logarithmic curve
   uint256 public constant liquidityGoal = 400 ether; //400 avax
   uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
+  uint256 public constant STARTING_SUPPLY = 10 * 1e18;
   uint256 public totalETHContributed = 1 * 1e14;
   uint256 public treasuryClaimableETH;
   uint256 public buyFee;
@@ -54,7 +55,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     buyFee = _buyFee;
     sellFee = _sellFee;
     bondingCurve = _bondingCurve;
-    _mint(BURN_ADDRESS, 10 * 1e18);
+    _mint(BURN_ADDRESS, STARTING_SUPPLY);
   }
 
   function buyTokens() external payable {
@@ -68,7 +69,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     treasuryClaimableETH += feeAmount;
     uint256 tokenBought = bondingCurve.calculatePurchaseReturn(
       totalSupply(),
-      totalETHContributed == 0 ? 1 : totalETHContributed, //not keeping it 0 due to bonding curve math
+      totalETHContributed,
       uint32(RESERVE_RATIO),
       remainingAmount,
       bytes("")
