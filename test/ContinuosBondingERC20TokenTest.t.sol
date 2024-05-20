@@ -69,6 +69,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     bondingERC20Token.buyTokens{ value: 4.05 ether }(); //liquidity goal will be (396 + 0.99 * 4.05 = 400.0095) ether now. hence, will revert as exceeded liquidity goal
 
     bondingERC20Token.buyTokens{ value: 4.04 ether }(); //liquidity goal will be (396 + 0.99 * 4.04 = 399.9996) ether now.
+    console2.log(bondingERC20Token.totalSupply());
   }
 
   function testCanBuyTokenFuzz(uint256 amount) public {
@@ -94,10 +95,37 @@ contract ContinuosBondingERC20TokenTest is Test {
     bondingERC20Token.buyTokens{ value: halfAmount }();
     uint256 receivedAfterSecondBuy = bondingERC20Token.balanceOf(user) - receivedAfterFirstBuy;
     uint256 tokenPerWeiForSecondBuy = (receivedAfterSecondBuy * 1e18) / halfAmount;
-    console2.log(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
     assertGt(receivedAfterFirstBuy, receivedAfterSecondBuy);
     assertGt(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
-    console2.log(bondingERC20Token.totalSupply());
+  }
+
+  function testNearlyEqualTokenMintedForEqualInputAmount() public {
+    uint256 amount = 100 ether;
+
+    vm.deal(user, amount);
+    vm.startPrank(user);
+
+    bondingERC20Token.buyTokens{ value: 10 ether }();
+    bondingERC20Token.buyTokens{ value: 90 ether }();
+    uint256 totalSupply1 = bondingERC20Token.totalSupply();
+    uint256 totalETHContributed1 = bondingERC20Token.totalETHContributed();
+    uint256 treasuryClaimableETH1 = bondingERC20Token.treasuryClaimableETH();
+
+    // resetting the state to initial
+    setUp();
+
+    vm.deal(user, amount);
+    vm.startPrank(user);
+
+    bondingERC20Token.buyTokens{ value: 50 ether }();
+    bondingERC20Token.buyTokens{ value: 50 ether }();
+    uint256 totalSupply2 = bondingERC20Token.totalSupply();
+    uint256 totalETHContributed2 = bondingERC20Token.totalETHContributed();
+    uint256 treasuryClaimableETH2 = bondingERC20Token.treasuryClaimableETH();
+
+    assert(_withinRange(totalSupply1, totalSupply2, 1e5)); // a bit of difference due to rounding issues
+    assertEq(totalETHContributed1, totalETHContributed2);
+    assertEq(treasuryClaimableETH1, treasuryClaimableETH2);
   }
 
   function testCanSellToken() public {
@@ -120,6 +148,32 @@ contract ContinuosBondingERC20TokenTest is Test {
     assert(_withinRange(ethReceived, 99 ether - (0.01 * 99 ether) - initialETHContribution, 1e14));
     assertEq(bondingERC20Token.totalETHContributed(), initialETHContribution + (99 ether - claimableETH));
     assertEq(bondingERC20Token.totalSupply(), startingSupply);
+  }
+
+  function testCanSellTokenFuzz(uint256 ethAmount, uint256 bondingTokenAmount) public {
+    ethAmount = bound(ethAmount, 1, 400 ether);
+
+    vm.deal(user, ethAmount);
+    vm.startPrank(user);
+
+    bondingERC20Token.buyTokens{ value: ethAmount }();
+
+    bondingTokenAmount = bound(bondingTokenAmount, 1, bondingERC20Token.balanceOf(user));
+    uint256 ethBalanceBefore = user.balance;
+
+    uint256 claimableETH = bondingERC20Token.calculateETHAmount(bondingTokenAmount);
+
+    bondingERC20Token.sellTokens(bondingTokenAmount);
+
+    uint256 ethReceived = user.balance - ethBalanceBefore;
+
+    assert(
+      _withinRange(
+        bondingERC20Token.totalETHContributed(),
+        initialETHContribution + ((99 * ethAmount) / 100 - claimableETH),
+        2
+      )
+    );
   }
 
   function _withinRange(uint256 a, uint256 b, uint256 diff) internal returns (bool) {
