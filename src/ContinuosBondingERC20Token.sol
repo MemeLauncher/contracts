@@ -6,38 +6,35 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { IUniswapV2Router02 } from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import { IUniswapV2Factory } from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
-import { BancorFormula } from "./BancorCurve/BancorFormula.sol";
 
 error NeedToSendETH();
 error NeedToSellTokens();
 error ContractNotEnoughETH();
 error FailedToSendETH();
-error LiquidityGoalReached();
-error ContributionMoreThanGoal();
+error InsufficientETH();
 error TransferNotAllowedUntilLiquidityGoalReached();
 error InvalidSender();
-
-// TODO: Review, Audit.
-// 4. Add max supply.
-// 5. Once liquidity goal is reached, the remanining supply is minted and added to the LP.
-// 6. Make sure there are not arbitrage oportunities once LP is created. (Maybe we add a cooldown for existing holders
-// 7. LP tokens should be burned after pair creation (or kept in the token contract).
+error LPCanNotBeCreated();
+error LiquidityGoalReached();
 
 contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
+  uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
+  address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+  uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
+
   IBondingCurve public immutable bondingCurve;
   IUniswapV2Router02 public immutable router;
   IUniswapV2Factory public immutable factory;
   address public immutable WETH;
-  address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
   address public immutable TREASURY_ADDRESS;
-  uint256 public constant RESERVE_RATIO = 333333; // Price factor for logarithmic curve
-  uint256 public constant liquidityGoal = 400 ether; //400 avax
-  uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
-  uint256 public constant STARTING_SUPPLY = 10 * 1e18;
-  uint256 public totalETHContributed = 1 * 1e14;
-  uint256 public treasuryClaimableETH;
+
+  uint256 public initialTokenBalance;
+  uint256 public ethBalance;
+  uint256 public availableTokenBalance;
   uint256 public buyFee;
   uint256 public sellFee;
+  uint256 public treasuryClaimableEth;
+  bool public isLpCreated;
 
   constructor(
     address _router,
@@ -46,7 +43,9 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     address _treasury,
     uint256 _buyFee,
     uint256 _sellFee,
-    IBondingCurve _bondingCurve
+    IBondingCurve _bondingCurve,
+    uint256 _initialTokenBalance,
+    uint256 _availableTokenBalance
   ) ERC20(_name, _symbol) {
     router = IUniswapV2Router02(_router);
     factory = IUniswapV2Factory(router.factory());
@@ -55,10 +54,13 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     buyFee = _buyFee;
     sellFee = _sellFee;
     bondingCurve = _bondingCurve;
-    _mint(BURN_ADDRESS, STARTING_SUPPLY);
+    _mint(address(this), MAX_TOTAL_SUPPLY);
+    initialTokenBalance = _initialTokenBalance;
+    ethBalance = _initialTokenBalance;
+    availableTokenBalance = _availableTokenBalance;
   }
 
-  function buyTokens() external payable {
+  function buyTokens() external payable nonReentrant returns (uint256) {
     if (liquidityGoalReached()) revert LiquidityGoalReached();
     if (msg.value == 0) revert NeedToSendETH();
 
@@ -66,70 +68,94 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     uint256 feeAmount = (ethAmount * buyFee) / PERCENTAGE_DENOMINATOR;
     uint256 remainingAmount = ethAmount - feeAmount;
 
-    treasuryClaimableETH += feeAmount;
-    uint256 tokenBought = bondingCurve.calculatePurchaseReturn(
-      totalSupply(),
-      totalETHContributed,
-      uint32(RESERVE_RATIO),
+    uint256 tokenReserveBalance = getReserve();
+    uint256 maxTokenToReceive = tokenReserveBalance - (MAX_TOTAL_SUPPLY - availableTokenBalance);
+
+    uint256 tokensToReceive = bondingCurve.calculatePurchaseReturn(
       remainingAmount,
+      ethBalance,
+      tokenReserveBalance,
       bytes("")
     );
-    _mint(msg.sender, tokenBought);
-    totalETHContributed += remainingAmount;
-    if (totalETHContributed == liquidityGoal) {
-      _createPair();
-    } else if (totalETHContributed > liquidityGoal) {
-      revert ContributionMoreThanGoal();
+    uint256 ethReceivedAmount = remainingAmount;
+    uint256 refund;
+    if (tokensToReceive > maxTokenToReceive) {
+      tokensToReceive = maxTokenToReceive;
+      ethReceivedAmount = getOutputPrice(tokensToReceive, ethBalance, tokenReserveBalance);
+      feeAmount = (ethReceivedAmount * buyFee) / PERCENTAGE_DENOMINATOR;
+      if (msg.value < (feeAmount + ethReceivedAmount)) {
+        revert InsufficientETH();
+      }
+      refund = msg.value - (feeAmount + ethReceivedAmount);
     }
+    ethBalance += remainingAmount;
+    treasuryClaimableEth += feeAmount;
+
+    _transfer(address(this), msg.sender, tokensToReceive);
+
+    (bool sent, ) = msg.sender.call{ value: refund }("");
+    if (!sent) {
+      revert FailedToSendETH();
+    }
+
+    if (liquidityGoalReached()) {
+      _createPair();
+    }
+
+    return tokensToReceive;
   }
 
-  function sellTokens(uint256 tokenAmount) external nonReentrant {
+  function sellTokens(uint256 tokenAmount) external nonReentrant returns (uint256) {
     if (liquidityGoalReached()) revert LiquidityGoalReached();
     if (tokenAmount == 0) revert NeedToSellTokens();
 
-    uint256 reimburseAmount = bondingCurve.calculateSaleReturn(
-      totalSupply(),
-      totalETHContributed,
-      uint32(RESERVE_RATIO),
-      tokenAmount,
-      bytes("")
-    );
-    if (address(this).balance < reimburseAmount) revert ContractNotEnoughETH();
+    uint256 tokenReserveBalance = getReserve();
+    uint256 reimburseAmount = bondingCurve.calculateSaleReturn(tokenAmount, tokenReserveBalance, ethBalance, bytes(""));
 
     uint256 feeAmount = (reimburseAmount * sellFee) / PERCENTAGE_DENOMINATOR;
-    totalETHContributed -= reimburseAmount;
+    ethBalance -= reimburseAmount;
     reimburseAmount -= feeAmount;
-    treasuryClaimableETH += feeAmount;
+    treasuryClaimableEth += feeAmount;
 
-    _burn(msg.sender, tokenAmount);
+    if (address(this).balance < reimburseAmount) revert ContractNotEnoughETH();
+
+    _transfer(msg.sender, address(this), tokenAmount);
     (bool sent, ) = msg.sender.call{ value: reimburseAmount }("");
     if (!sent) revert FailedToSendETH();
   }
 
+  function getReserve() public view returns (uint256) {
+    return balanceOf(address(this));
+  }
+
+  function getOutputPrice(
+    uint256 outputAmount,
+    uint256 inputReserve,
+    uint256 outputReserve
+  ) public pure returns (uint256) {
+    require(inputReserve > 0 && outputReserve > 0, "Reserves must be greater than 0");
+    uint256 numerator = inputReserve * outputAmount;
+    uint256 denominator = (outputReserve - outputAmount);
+    return numerator / denominator + 1;
+  }
+
   function liquidityGoalReached() public view returns (bool) {
-    return (totalETHContributed >= liquidityGoal);
+    return getReserve() <= (MAX_TOTAL_SUPPLY - availableTokenBalance);
+  }
+
+  function totalEthContributed() public view returns (uint256) {
+    return ethBalance - initialTokenBalance;
   }
 
   function calculateTokenAmount(uint256 ethAmount) public view returns (uint256) {
-    return
-      bondingCurve.calculatePurchaseReturn(
-        totalSupply(),
-        totalETHContributed,
-        uint32(RESERVE_RATIO),
-        ethAmount,
-        bytes("")
-      );
+    uint256 tokenReserveBalance = getReserve();
+    return bondingCurve.calculatePurchaseReturn(ethAmount, ethBalance, tokenReserveBalance, bytes(""));
   }
 
   function calculateETHAmount(uint256 tokenAmount) public view returns (uint256) {
-    return
-      bondingCurve.calculateSaleReturn(
-        totalSupply(),
-        totalETHContributed,
-        uint32(RESERVE_RATIO),
-        tokenAmount,
-        bytes("")
-      );
+    uint256 tokenReserveBalance = getReserve();
+
+    return bondingCurve.calculateSaleReturn(tokenAmount, tokenReserveBalance, ethBalance, bytes(""));
   }
 
   function claimTreasuryBalance(address to, uint256 amount) public {
@@ -137,35 +163,37 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       revert InvalidSender();
     }
     // this will revert if amount requested is more than claimable
-    treasuryClaimableETH -= amount;
+    treasuryClaimableEth -= amount;
     (bool sent, ) = to.call{ value: amount }("");
     if (!sent) revert FailedToSendETH();
   }
 
-  // TODO change this because we will need to determine parameters to create liquidity
   function _createPair() internal {
-    uint256 ethAmount = address(this).balance;
-    uint256 tokenAmount = this.balanceOf(address(this));
-    _approve(address(this), address(router), tokenAmount);
+    uint256 currentTokenBalance = getReserve();
+    uint256 currentEth = ethBalance - initialTokenBalance;
+    isLpCreated = true;
 
-    // Add liquidity
-    (, , uint256 liquidity) = router.addLiquidityETH{ value: ethAmount }(
+    _approve(address(this), address(router), currentTokenBalance);
+
+    // // Add liquidity
+    (, , uint256 liquidity) = router.addLiquidityETH{ value: currentEth }(
       address(this),
-      tokenAmount,
-      tokenAmount,
-      ethAmount,
+      currentTokenBalance,
+      currentTokenBalance,
+      currentEth,
       address(this),
       block.timestamp
     );
-
-    // Burn the LP tokens received
+    // // Burn the LP tokens received
     IERC20 lpToken = IERC20(factory.getPair(address(this), WETH));
     lpToken.transfer(BURN_ADDRESS, liquidity);
   }
 
   function _update(address from, address to, uint256 value) internal virtual override {
     // will revert for normal transfer till goal not reached
-    if (!liquidityGoalReached() && from != address(0) && to != address(0)) {
+    if (
+      !liquidityGoalReached() && from != address(0) && to != address(0) && from != address(this) && to != address(this)
+    ) {
       revert TransferNotAllowedUntilLiquidityGoalReached();
     }
     super._update(from, to, value);
