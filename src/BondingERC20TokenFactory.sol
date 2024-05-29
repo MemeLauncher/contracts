@@ -13,7 +13,7 @@ event AvailableTokenUpdated(uint256 indexed newAvailableToken, uint256 indexed o
 
 event InitialTokenBalanceUpdated(uint256 indexed newInitialTokenBalance, uint256 indexed oldInitialTokenBalance);
 
-event TokenDeployed(address indexed token);
+event TokenDeployed(address indexed token, address indexed deployer);
 
 contract BondingERC20TokenFactory is Ownable {
   IBondingCurve public bondingCurve;
@@ -52,7 +52,7 @@ contract BondingERC20TokenFactory is Ownable {
       initialTokenBalance,
       availableTokenBalance
     );
-    emit TokenDeployed(address(_bondingERC20Token));
+    emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
     return address(_bondingERC20Token);
   }
