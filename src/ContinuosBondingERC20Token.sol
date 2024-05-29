@@ -7,6 +7,11 @@ import { IUniswapV2Router02 } from "@uniswap/v2-periphery/contracts/interfaces/I
 import { IUniswapV2Factory } from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
 
+event TokensBought(address indexed buyer, uint256 ethAmount, uint256 tokenBought, uint256 feeEarnedByTreasury);
+event TokensSold(address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 feeEarnedByTreasury);
+event TreasuryClaimed(address indexed to, uint256 amount);
+event PairCreated(uint256 ethAmount, uint256 tokenAmount, uint256 liquidity, address lpToken);
+
 error NeedToSendETH();
 error NeedToSellTokens();
 error ContractNotEnoughETH();
@@ -102,6 +107,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       _createPair();
     }
 
+    emit TokensBought(msg.sender, ethReceivedAmount, tokensToReceive, feeAmount);
+
     return tokensToReceive;
   }
 
@@ -122,6 +129,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     _transfer(msg.sender, address(this), tokenAmount);
     (bool sent, ) = msg.sender.call{ value: reimburseAmount }("");
     if (!sent) revert FailedToSendETH();
+
+    emit TokensSold(msg.sender, tokenAmount, reimburseAmount, feeAmount);
   }
 
   function getReserve() public view returns (uint256) {
@@ -166,6 +175,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     treasuryClaimableEth -= amount;
     (bool sent, ) = to.call{ value: amount }("");
     if (!sent) revert FailedToSendETH();
+
+    emit TreasuryClaimed(to, amount);
   }
 
   function _createPair() internal {
@@ -187,6 +198,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     // // Burn the LP tokens received
     IERC20 lpToken = IERC20(factory.getPair(address(this), WETH));
     lpToken.transfer(BURN_ADDRESS, liquidity);
+
+    emit PairCreated(currentEth, currentTokenBalance, liquidity, address(lpToken));
   }
 
   function _update(address from, address to, uint256 value) internal virtual override {
