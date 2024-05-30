@@ -7,7 +7,7 @@ import { console2 } from "forge-std/src/console2.sol";
 import { BondingERC20TokenFactory, TokenDeployed } from "src/BondingERC20TokenFactory.sol";
 import { IBondingCurve } from "src/interfaces/IBondingCurve.sol";
 import { IContinuousBondingERC20Token } from "src/interfaces/IContinuousBondingERC20Token.sol";
-import { AMMFormula } from "src/BancorCurve/AMMFormula.sol";
+import { AMMFormula } from "src/utils/AMMFormula.sol";
 
 contract BondingERC20TokenFactoryTest is Test {
   BondingERC20TokenFactory internal factory;
