@@ -9,7 +9,7 @@ import { BondingERC20TokenFactory } from "src/BondingERC20TokenFactory.sol";
 import { ContinuosBondingERC20Token } from "src/ContinuosBondingERC20Token.sol";
 import { IContinuousBondingERC20Token } from "src/interfaces/IContinuousBondingERC20Token.sol";
 import { IBondingCurve } from "src/interfaces/IBondingCurve.sol";
-import { AMMFormula } from "src/BancorCurve/AMMFormula.sol";
+import { AMMFormula } from "src/utils/AMMFormula.sol";
 
 interface IUniswapV2Factory {}
 
