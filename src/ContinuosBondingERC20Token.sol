@@ -3,8 +3,8 @@ pragma solidity ^0.8.25;
 
 import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { IUniswapV2Router02 } from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import { IUniswapV2Factory } from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import { IJoeRouter02 } from "./interfaces/IJoeRouter02.sol";
+import { IFactory } from "./interfaces/IFactory.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
 
 event TokensBought(address indexed buyer, uint256 ethAmount, uint256 tokenBought, uint256 feeEarnedByTreasury);
@@ -28,9 +28,9 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
 
   IBondingCurve public immutable bondingCurve;
-  IUniswapV2Router02 public immutable router;
-  IUniswapV2Factory public immutable factory;
-  address public immutable WETH;
+  IJoeRouter02 public immutable router;
+  IFactory public immutable factory;
+  address public immutable WAVAX;
   address public immutable TREASURY_ADDRESS;
 
   uint256 public initialTokenBalance;
@@ -52,9 +52,9 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     uint256 _initialTokenBalance,
     uint256 _availableTokenBalance
   ) ERC20(_name, _symbol) {
-    router = IUniswapV2Router02(_router);
-    factory = IUniswapV2Factory(router.factory());
-    WETH = router.WETH();
+    router = IJoeRouter02(_router);
+    factory = IFactory(router.factory());
+    WAVAX = router.WAVAX();
     TREASURY_ADDRESS = _treasury;
     buyFee = _buyFee;
     sellFee = _sellFee;
@@ -93,7 +93,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       }
       refund = msg.value - (feeAmount + ethReceivedAmount);
     }
-    ethBalance += remainingAmount;
+    ethBalance += ethReceivedAmount;
     treasuryClaimableEth += feeAmount;
 
     _transfer(address(this), msg.sender, tokensToReceive);
@@ -105,6 +105,14 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
 
     if (liquidityGoalReached()) {
       _createPair();
+    }
+
+    if (treasuryClaimableEth >= 0.1 ether) {
+      (bool sent, ) = TREASURY_ADDRESS.call{ value: treasuryClaimableEth }("");
+      treasuryClaimableEth = 0;
+      if (!sent) {
+        revert FailedToSendETH();
+      }
     }
 
     emit TokensBought(msg.sender, ethReceivedAmount, tokensToReceive, feeAmount);
@@ -129,6 +137,14 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     _transfer(msg.sender, address(this), tokenAmount);
     (bool sent, ) = msg.sender.call{ value: reimburseAmount }("");
     if (!sent) revert FailedToSendETH();
+
+    if (treasuryClaimableEth >= 0.1 ether) {
+      (bool sent, ) = TREASURY_ADDRESS.call{ value: treasuryClaimableEth }("");
+      treasuryClaimableEth = 0;
+      if (!sent) {
+        revert FailedToSendETH();
+      }
+    }
 
     emit TokensSold(msg.sender, tokenAmount, reimburseAmount, feeAmount);
   }
@@ -187,7 +203,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     _approve(address(this), address(router), currentTokenBalance);
 
     // // Add liquidity
-    (, , uint256 liquidity) = router.addLiquidityETH{ value: currentEth }(
+    (, , uint256 liquidity) = router.addLiquidityAVAX{ value: currentEth }(
       address(this),
       currentTokenBalance,
       currentTokenBalance,
@@ -196,7 +212,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       block.timestamp
     );
     // // Burn the LP tokens received
-    IERC20 lpToken = IERC20(factory.getPair(address(this), WETH));
+    IERC20 lpToken = IERC20(factory.getPair(address(this), WAVAX));
     lpToken.transfer(BURN_ADDRESS, liquidity);
 
     emit PairCreated(currentEth, currentTokenBalance, liquidity, address(lpToken));

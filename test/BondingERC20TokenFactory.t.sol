@@ -19,10 +19,10 @@ contract BondingERC20TokenFactoryTest is Test {
   uint256 internal initialTokenBalance = 50 * 10 ** 18;
 
   function setUp() public {
-    uint256 forkId = vm.createFork(vm.envString("ETH_RPC_URL"), 19876830);
+    uint256 forkId = vm.createFork(vm.envString("AVAX_RPC_URL"), 19876830);
     vm.selectFork(forkId);
 
-    router = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    router = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4; // trader-joe router
     bondingCurve = new AMMFormula();
     factory = new BondingERC20TokenFactory(owner, bondingCurve, treasury, initialTokenBalance, availableTokenBalance);
   }
