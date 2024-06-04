@@ -22,6 +22,8 @@ contract ContinuosBondingERC20TokenTest is Test {
   uint256 internal initialTokenBalance = 50 ether; // liquidity goal will be reached at (50*4) avax. formula can be generalised
   uint256 internal expectedLiquidityGoal = 200 ether;
   uint256 internal MAX_TOTAL_SUPPLY = 1_000_000_000 ether;
+  uint256 internal buyFee = 100;
+  uint256 internal sellFee = 100;
 
   BondingERC20TokenFactory internal factory;
   IBondingCurve internal bondingCurve;
@@ -31,10 +33,16 @@ contract ContinuosBondingERC20TokenTest is Test {
     uint256 forkId = vm.createFork(vm.envString("AVAX_RPC_URL"), 19876830);
     vm.selectFork(forkId);
     bondingCurve = new AMMFormula();
-    factory = new BondingERC20TokenFactory(owner, bondingCurve, treasury, initialTokenBalance, availableTokenBalance);
-    bondingERC20Token = ContinuosBondingERC20Token(
-      factory.deployBondingERC20Token(router, "ERC20Token", "ERC20", 100, 100)
+    factory = new BondingERC20TokenFactory(
+      owner,
+      bondingCurve,
+      treasury,
+      initialTokenBalance,
+      availableTokenBalance,
+      buyFee,
+      sellFee
     );
+    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20Token(router, "ERC20Token", "ERC20"));
   }
 
   function testSetUp() public {
