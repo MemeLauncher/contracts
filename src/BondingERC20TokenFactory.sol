@@ -13,6 +13,10 @@ event AvailableTokenUpdated(uint256 indexed newAvailableToken, uint256 indexed o
 
 event InitialTokenBalanceUpdated(uint256 indexed newInitialTokenBalance, uint256 indexed oldInitialTokenBalance);
 
+event BuyFeeUpdated(uint256 indexed newBuyFee, uint256 indexed oldBuyFee);
+
+event SellFeeUpdated(uint256 indexed newSellFee, uint256 indexed oldSellFee);
+
 event TokenDeployed(address indexed token, address indexed deployer);
 
 contract BondingERC20TokenFactory is Ownable {
@@ -20,34 +24,38 @@ contract BondingERC20TokenFactory is Ownable {
   address public treasury;
   uint256 public initialTokenBalance;
   uint256 public availableTokenBalance;
+  uint256 public buyFee;
+  uint256 public sellFee;
 
   constructor(
     address _owner,
     IBondingCurve _bondingCurve,
     address _treasury,
     uint256 _initialTokenBalance,
-    uint256 _availableTokenBalance
+    uint256 _availableTokenBalance,
+    uint256 _buyFee,
+    uint256 _sellFee
   ) Ownable(_owner) {
     bondingCurve = _bondingCurve;
     treasury = _treasury;
     initialTokenBalance = _initialTokenBalance;
     availableTokenBalance = _availableTokenBalance;
+    buyFee = _buyFee;
+    sellFee = _sellFee;
   }
 
   function deployBondingERC20Token(
     address _router,
     string memory _name,
-    string memory _symbol,
-    uint256 _buyFee,
-    uint256 _sellFee
+    string memory _symbol
   ) public returns (address) {
     ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
       _router,
       _name,
       _symbol,
       treasury,
-      _buyFee,
-      _sellFee,
+      buyFee,
+      sellFee,
       bondingCurve,
       initialTokenBalance,
       availableTokenBalance
@@ -55,6 +63,16 @@ contract BondingERC20TokenFactory is Ownable {
     emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
     return address(_bondingERC20Token);
+  }
+
+  function updateBuyFee(uint256 _newBuyFee) public onlyOwner {
+    emit BuyFeeUpdated(_newBuyFee, buyFee);
+    buyFee = _newBuyFee;
+  }
+
+  function updateSellFee(uint256 _newSellFee) public onlyOwner {
+    emit SellFeeUpdated(_newSellFee, sellFee);
+    sellFee = _newSellFee;
   }
 
   function updateTreasury(address _newTreasury) public onlyOwner {
