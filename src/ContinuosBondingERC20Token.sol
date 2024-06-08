@@ -21,6 +21,7 @@ error TransferNotAllowedUntilLiquidityGoalReached();
 error InvalidSender();
 error LPCanNotBeCreated();
 error LiquidityGoalReached();
+error InSufficientAmountReceived();
 
 contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
@@ -65,7 +66,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     availableTokenBalance = _availableTokenBalance;
   }
 
-  function buyTokens() external payable nonReentrant returns (uint256) {
+  function buyTokens(uint256 minExpectedAmount) external payable nonReentrant returns (uint256) {
     if (liquidityGoalReached()) revert LiquidityGoalReached();
     if (msg.value == 0) revert NeedToSendETH();
 
@@ -82,6 +83,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
       tokenReserveBalance,
       bytes("")
     );
+    if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
     uint256 ethReceivedAmount = remainingAmount;
     uint256 refund;
     if (tokensToReceive > maxTokenToReceive) {
@@ -120,7 +122,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     return tokensToReceive;
   }
 
-  function sellTokens(uint256 tokenAmount) external nonReentrant returns (uint256) {
+  function sellTokens(uint256 tokenAmount, uint256 minExpectedEth) external nonReentrant returns (uint256) {
     if (liquidityGoalReached()) revert LiquidityGoalReached();
     if (tokenAmount == 0) revert NeedToSellTokens();
 
@@ -132,6 +134,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     reimburseAmount -= feeAmount;
     treasuryClaimableEth += feeAmount;
 
+    if (reimburseAmount < minExpectedEth) revert InSufficientAmountReceived();
     if (address(this).balance < reimburseAmount) revert ContractNotEnoughETH();
 
     _transfer(msg.sender, address(this), tokenAmount);
