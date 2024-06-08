@@ -21,7 +21,7 @@ contract BondingERC20TokenFactoryTest is Test {
   uint256 internal sellFee = 100;
 
   function setUp() public {
-    uint256 forkId = vm.createFork(vm.envString("AVAX_RPC_URL"), 19876830);
+    uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 19876830);
     vm.selectFork(forkId);
 
     router = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4; // trader-joe router
