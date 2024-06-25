@@ -19,6 +19,11 @@ event SellFeeUpdated(uint256 indexed newSellFee, uint256 indexed oldSellFee);
 
 event TokenDeployed(address indexed token, address indexed deployer);
 
+enum LP_POOL {
+  Uniswap,
+  TraderJoe
+}
+
 contract BondingERC20TokenFactory is Ownable {
   IBondingCurve public bondingCurve;
   address public treasury;
@@ -47,7 +52,8 @@ contract BondingERC20TokenFactory is Ownable {
   function deployBondingERC20Token(
     address _router,
     string memory _name,
-    string memory _symbol
+    string memory _symbol,
+    LP_POOL _poolType
   ) public returns (address) {
     ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
       _router,
@@ -58,7 +64,8 @@ contract BondingERC20TokenFactory is Ownable {
       sellFee,
       bondingCurve,
       initialTokenBalance,
-      availableTokenBalance
+      availableTokenBalance,
+      _poolType
     );
     emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 

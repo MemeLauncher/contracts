@@ -5,7 +5,7 @@ import { Test } from "forge-std/src/Test.sol";
 import { console2 } from "forge-std/src/console2.sol";
 import { stdMath } from "forge-std/src/StdMath.sol";
 
-import { BondingERC20TokenFactory } from "src/BondingERC20TokenFactory.sol";
+import { BondingERC20TokenFactory, LP_POOL } from "src/BondingERC20TokenFactory.sol";
 import { ContinuosBondingERC20Token } from "src/ContinuosBondingERC20Token.sol";
 import { IContinuousBondingERC20Token } from "src/interfaces/IContinuousBondingERC20Token.sol";
 import { IBondingCurve } from "src/interfaces/IBondingCurve.sol";
@@ -42,13 +42,16 @@ contract ContinuosBondingERC20TokenTest is Test {
       buyFee,
       sellFee
     );
-    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20Token(router, "ERC20Token", "ERC20"));
+    bondingERC20Token = ContinuosBondingERC20Token(
+      factory.deployBondingERC20Token(router, "ERC20Token", "ERC20", LP_POOL.TraderJoe)
+    );
   }
 
   function testSetUp() public {
     assertEq(bondingERC20Token.initialTokenBalance(), initialTokenBalance);
     assertEq(bondingERC20Token.availableTokenBalance(), availableTokenBalance);
     assertEq(bondingERC20Token.treasuryClaimableEth(), 0);
+    assertEq(uint8(bondingERC20Token.poolType()), uint8(LP_POOL.TraderJoe));
   }
 
   function testCanBuyToken() public {
