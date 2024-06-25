@@ -4,8 +4,10 @@ pragma solidity ^0.8.25;
 import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IJoeRouter02 } from "./interfaces/IJoeRouter02.sol";
+import { IUniswapV2Router02 } from "./interfaces/IUniswapV2Router02.sol";
 import { IFactory } from "./interfaces/IFactory.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
+import { LP_POOL } from "./BondingERC20TokenFactory.sol";
 
 event TokensBought(address indexed buyer, uint256 ethAmount, uint256 tokenBought, uint256 feeEarnedByTreasury);
 event TokensSold(address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 feeEarnedByTreasury);
@@ -29,9 +31,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
 
   IBondingCurve public immutable bondingCurve;
-  IJoeRouter02 public immutable router;
+  address public immutable router;
   IFactory public immutable factory;
-  address public immutable WAVAX;
   address public immutable TREASURY_ADDRESS;
 
   uint256 public initialTokenBalance;
@@ -41,6 +42,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
   uint256 public sellFee;
   uint256 public treasuryClaimableEth;
   bool public isLpCreated;
+  LP_POOL public poolType;
 
   constructor(
     address _router,
@@ -51,11 +53,11 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     uint256 _sellFee,
     IBondingCurve _bondingCurve,
     uint256 _initialTokenBalance,
-    uint256 _availableTokenBalance
+    uint256 _availableTokenBalance,
+    LP_POOL _poolType
   ) ERC20(_name, _symbol) {
-    router = IJoeRouter02(_router);
-    factory = IFactory(router.factory());
-    WAVAX = router.WAVAX();
+    router = _router;
+    factory = IFactory(IJoeRouter02(router).factory());
     TREASURY_ADDRESS = _treasury;
     buyFee = _buyFee;
     sellFee = _sellFee;
@@ -64,6 +66,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     initialTokenBalance = _initialTokenBalance;
     ethBalance = _initialTokenBalance;
     availableTokenBalance = _availableTokenBalance;
+    poolType = _poolType;
   }
 
   function buyTokens(uint256 minExpectedAmount) external payable nonReentrant returns (uint256) {
@@ -205,17 +208,31 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
 
     _approve(address(this), address(router), currentTokenBalance);
 
-    // // Add liquidity
-    (, , uint256 liquidity) = router.addLiquidityAVAX{ value: currentEth }(
-      address(this),
-      currentTokenBalance,
-      currentTokenBalance,
-      currentEth,
-      address(this),
-      block.timestamp
-    );
-    // // Burn the LP tokens received
-    IERC20 lpToken = IERC20(factory.getPair(address(this), WAVAX));
+    address wNative;
+    uint256 liquidity;
+    if (poolType == LP_POOL.Uniswap) {
+      wNative = IUniswapV2Router02(router).WETH();
+      (, , liquidity) = IUniswapV2Router02(router).addLiquidityETH{ value: currentEth }(
+        address(this),
+        currentTokenBalance,
+        currentTokenBalance,
+        currentEth,
+        address(this),
+        block.timestamp
+      );
+    } else if (poolType == LP_POOL.TraderJoe) {
+      wNative = IJoeRouter02(router).WAVAX();
+      (, , liquidity) = IJoeRouter02(router).addLiquidityAVAX{ value: currentEth }(
+        address(this),
+        currentTokenBalance,
+        currentTokenBalance,
+        currentEth,
+        address(this),
+        block.timestamp
+      );
+    }
+    // Burn the LP tokens received
+    IERC20 lpToken = IERC20(factory.getPair(address(this), wNative));
     lpToken.transfer(BURN_ADDRESS, liquidity);
 
     emit PairCreated(currentEth, currentTokenBalance, liquidity, address(lpToken));
