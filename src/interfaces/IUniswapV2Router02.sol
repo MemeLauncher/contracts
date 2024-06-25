@@ -2,15 +2,18 @@
 pragma solidity ^0.8.25;
 
 interface IUniswapV2Router02 {
-  function factory() external pure returns (address);
-  function WETH() external pure returns (address);
+    function factory() external pure returns (address);
+    function WETH() external pure returns (address);
 
-  function addLiquidityETH(
-    address token,
-    uint amountTokenDesired,
-    uint amountTokenMin,
-    uint amountETHMin,
-    address to,
-    uint deadline
-  ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
+    function addLiquidityETH(
+        address token,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to,
+        uint256 deadline
+    )
+        external
+        payable
+        returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
 }
