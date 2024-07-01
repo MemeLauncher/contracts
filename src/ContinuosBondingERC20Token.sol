@@ -75,7 +75,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     }
 
     function buyTokens(uint256 minExpectedAmount) external payable nonReentrant returns (uint256) {
-        if (liquidityGoalReached()) revert LiquidityGoalReached();
+        if (liquidityGoalReached() || isLpCreated) revert LiquidityGoalReached();
         if (msg.value == 0) revert NeedToSendETH();
 
         uint256 ethAmount = msg.value;
@@ -127,7 +127,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     }
 
     function sellTokens(uint256 tokenAmount, uint256 minExpectedEth) external nonReentrant returns (uint256) {
-        if (liquidityGoalReached()) revert LiquidityGoalReached();
+        if (liquidityGoalReached() || isLpCreated) revert LiquidityGoalReached();
         if (tokenAmount == 0) revert NeedToSellTokens();
 
         uint256 tokenReserveBalance = getReserve();
