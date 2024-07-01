@@ -238,7 +238,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         // will revert for normal transfer till goal not reached
         if (
             !liquidityGoalReached() && from != address(0) && to != address(0) && from != address(this)
-                && to != address(this)
+                && to != address(this) && !isLpCreated
         ) {
             revert TransferNotAllowedUntilLiquidityGoalReached();
         }
