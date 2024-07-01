@@ -87,7 +87,6 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
 
         uint256 tokensToReceive =
             bondingCurve.calculatePurchaseReturn(remainingAmount, ethBalance, tokenReserveBalance, bytes(""));
-        if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
         uint256 ethReceivedAmount = remainingAmount;
         uint256 refund;
         if (tokensToReceive > maxTokenToReceive) {
@@ -101,6 +100,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         }
         ethBalance += ethReceivedAmount;
         treasuryClaimableEth += feeAmount;
+        if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
         _transfer(address(this), msg.sender, tokensToReceive);
 
