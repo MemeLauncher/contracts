@@ -38,4 +38,19 @@ contract AMMFormula is IBondingCurve {
 
         return numerator / denominator;
     }
+
+    function getOutputPrice(
+        uint256 outputAmount,
+        uint256 inputReserve,
+        uint256 outputReserve
+    )
+        public
+        pure
+        returns (uint256)
+    {
+        require(inputReserve > 0 && outputReserve > 0, "Reserves must be greater than 0");
+        uint256 numerator = inputReserve * outputAmount;
+        uint256 denominator = (outputReserve - outputAmount);
+        return numerator / denominator + 1;
+    }
 }

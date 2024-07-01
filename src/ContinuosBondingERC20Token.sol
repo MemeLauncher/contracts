@@ -92,7 +92,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         uint256 refund;
         if (tokensToReceive > maxTokenToReceive) {
             tokensToReceive = maxTokenToReceive;
-            ethReceivedAmount = getOutputPrice(tokensToReceive, ethBalance, tokenReserveBalance);
+            ethReceivedAmount = bondingCurve.getOutputPrice(tokensToReceive, ethBalance, tokenReserveBalance);
             feeAmount = (ethReceivedAmount * buyFee) / PERCENTAGE_DENOMINATOR;
             if (msg.value < (feeAmount + ethReceivedAmount)) {
                 revert InsufficientETH();
@@ -159,21 +159,6 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
 
     function getReserve() public view returns (uint256) {
         return balanceOf(address(this));
-    }
-
-    function getOutputPrice(
-        uint256 outputAmount,
-        uint256 inputReserve,
-        uint256 outputReserve
-    )
-        public
-        pure
-        returns (uint256)
-    {
-        require(inputReserve > 0 && outputReserve > 0, "Reserves must be greater than 0");
-        uint256 numerator = inputReserve * outputAmount;
-        uint256 denominator = (outputReserve - outputAmount);
-        return numerator / denominator + 1;
     }
 
     function liquidityGoalReached() public view returns (bool) {
