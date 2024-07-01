@@ -21,4 +21,13 @@ interface IBondingCurve {
         external
         view
         returns (uint256);
+
+    function getOutputPrice(
+        uint256 outputAmount,
+        uint256 inputReserve,
+        uint256 outputReserve
+    )
+        external
+        pure
+        returns (uint256);
 }
