@@ -195,6 +195,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     function _createPair() internal {
         uint256 currentTokenBalance = getReserve();
         uint256 currentEth = ethBalance - initialTokenBalance;
+        currentEth = currentEth > address(this).balance ? address(this).balance : currentEth;
         isLpCreated = true;
 
         _approve(address(this), address(router), currentTokenBalance);
