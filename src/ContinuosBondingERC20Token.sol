@@ -140,7 +140,7 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         treasuryClaimableEth += feeAmount;
 
         if (reimburseAmount < minExpectedEth) revert InSufficientAmountReceived();
-        if (address(this).balance < reimburseAmount) revert ContractNotEnoughETH();
+        if (address(this).balance < reimburseAmount + treasuryClaimableEth) revert ContractNotEnoughETH();
 
         _transfer(msg.sender, address(this), tokenAmount);
         (bool sent,) = msg.sender.call{ value: reimburseAmount }("");
