@@ -104,13 +104,13 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
 
         _transfer(address(this), msg.sender, tokensToReceive);
 
+        if (liquidityGoalReached()) {
+            _createPair();
+        }
+
         (bool sent,) = msg.sender.call{ value: refund }("");
         if (!sent) {
             revert FailedToSendETH();
-        }
-
-        if (liquidityGoalReached()) {
-            _createPair();
         }
 
         if (treasuryClaimableEth >= 0.1 ether) {
