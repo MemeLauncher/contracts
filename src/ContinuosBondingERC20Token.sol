@@ -7,6 +7,8 @@ import { IJoeRouter02 } from "./interfaces/IJoeRouter02.sol";
 import { IUniswapV2Router02 } from "./interfaces/IUniswapV2Router02.sol";
 import { IFactory } from "./interfaces/IFactory.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
+import { IWETH } from "./interfaces/IWETH.sol";
+import { IPair } from "./interfaces/IPair.sol";
 import { LP_POOL } from "./BondingERC20TokenFactory.sol";
 
 event TokensBought(address indexed buyer, uint256 ethAmount, uint256 tokenBought, uint256 feeEarnedByTreasury);
@@ -204,14 +206,22 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         uint256 liquidity;
         if (poolType == LP_POOL.Uniswap) {
             wNative = IUniswapV2Router02(router).WETH();
-            (,, liquidity) = IUniswapV2Router02(router).addLiquidityETH{ value: currentEth }(
-                address(this), currentTokenBalance, currentTokenBalance, currentEth, address(this), block.timestamp
-            );
+
+            address pair = factory.getPair(address(this), wNative);
+            if (pair == address(0)) pair = factory.createPair(address(this), wNative);
+            IWETH(wNative).deposit{ value: currentEth }();
+            IWETH(wNative).transfer(pair, currentEth);
+            _transfer(address(this), pair, currentTokenBalance);
+            liquidity = IPair(pair).mint(address(this));
         } else if (poolType == LP_POOL.TraderJoe) {
             wNative = IJoeRouter02(router).WAVAX();
-            (,, liquidity) = IJoeRouter02(router).addLiquidityAVAX{ value: currentEth }(
-                address(this), currentTokenBalance, currentTokenBalance, currentEth, address(this), block.timestamp
-            );
+
+            address pair = factory.getPair(address(this), wNative);
+            if (pair == address(0)) pair = factory.createPair(address(this), wNative);
+            IWETH(wNative).deposit{ value: currentEth }();
+            IWETH(wNative).transfer(pair, currentEth);
+            _transfer(address(this), pair, currentTokenBalance);
+            liquidity = IPair(pair).mint(address(this));
         }
         // Burn the LP tokens received
         IERC20 lpToken = IERC20(factory.getPair(address(this), wNative));

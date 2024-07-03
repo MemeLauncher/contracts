@@ -4,4 +4,5 @@ pragma experimental ABIEncoderV2;
 
 interface IFactory {
     function getPair(address token0, address token1) external view returns (address);
+    function createPair(address token0, address token1) external returns (address);
 }
