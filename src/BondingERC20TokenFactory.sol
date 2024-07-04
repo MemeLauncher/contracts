@@ -19,7 +19,7 @@ event SellFeeUpdated(uint256 indexed newSellFee, uint256 indexed oldSellFee);
 
 event TokenDeployed(address indexed token, address indexed deployer);
 
-event RouterUpdated(LP_POOL indexed poolType, address indexed router);
+event RouterUpdated(address indexed router, bool allowed);
 
 error RouterNotSet();
 
@@ -35,7 +35,7 @@ contract BondingERC20TokenFactory is Ownable {
     uint256 public availableTokenBalance;
     uint256 public buyFee;
     uint256 public sellFee;
-    mapping(LP_POOL poolType => address) public router;
+    mapping(address router => bool allowed) public allowedRouter;
 
     constructor(
         address _owner,
@@ -57,6 +57,7 @@ contract BondingERC20TokenFactory is Ownable {
     }
 
     function deployBondingERC20Token(
+        address _router,
         string memory _name,
         string memory _symbol,
         LP_POOL _poolType
@@ -64,11 +65,11 @@ contract BondingERC20TokenFactory is Ownable {
         public
         returns (address)
     {
-        if (router[_poolType] == address(0)) {
+        if (!allowedRouter[_router]) {
             revert RouterNotSet();
         }
         ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
-            router[_poolType],
+            _router,
             _name,
             _symbol,
             treasury,
@@ -84,9 +85,9 @@ contract BondingERC20TokenFactory is Ownable {
         return address(_bondingERC20Token);
     }
 
-    function updateRouter(LP_POOL _poolType, address _router) public onlyOwner {
-        emit RouterUpdated(_poolType, _router);
-        router[_poolType] = _router;
+    function updateRouter(address _router, bool _allowed) public onlyOwner {
+        emit RouterUpdated(_router, _allowed);
+        allowedRouter[_router] = _allowed;
     }
 
     function updateBuyFee(uint256 _newBuyFee) public onlyOwner {
