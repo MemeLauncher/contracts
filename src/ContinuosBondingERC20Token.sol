@@ -94,7 +94,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         if (tokensToReceive > maxTokenToReceive) {
             tokensToReceive = maxTokenToReceive;
             ethReceivedAmount = bondingCurve.getOutputPrice(tokensToReceive, ethBalance, tokenReserveBalance);
-            feeAmount = (ethReceivedAmount * buyFee) / PERCENTAGE_DENOMINATOR;
+            feeAmount =
+                (ethReceivedAmount * PERCENTAGE_DENOMINATOR) / (PERCENTAGE_DENOMINATOR - buyFee) - ethReceivedAmount;
             if (msg.value < (feeAmount + ethReceivedAmount)) {
                 revert InsufficientETH();
             }
@@ -200,7 +201,8 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         currentEth = currentEth > address(this).balance ? address(this).balance : currentEth;
         isLpCreated = true;
 
-        _approve(address(this), address(router), currentTokenBalance);
+        //is this line necessary? can be removed
+        // _approve(address(this), address(router), currentTokenBalance);
 
         address wNative;
         uint256 liquidity;
