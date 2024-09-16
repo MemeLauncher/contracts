@@ -11,4 +11,5 @@ interface IContinuousBondingERC20Token {
     function totalEthContributed() external returns (uint256);
     function isLpCreated() external returns (bool);
     function poolType() external returns (LP_POOL);
+    function updateRouter(address _router, bool _allowed) external;
 }
