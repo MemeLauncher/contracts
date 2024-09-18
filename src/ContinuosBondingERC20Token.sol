@@ -24,7 +24,6 @@ error NeedToSellTokens();
 error ContractNotEnoughETH();
 error FailedToSendETH();
 error InsufficientETH();
-error TransferNotAllowedUntilLiquidityGoalReached();
 error InvalidSender();
 error LPCanNotBeCreated();
 error LiquidityGoalReached();
@@ -230,16 +229,5 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         lpToken.transfer(BURN_ADDRESS, liquidity);
 
         emit PairCreated(currentEth, currentTokenBalance, liquidity, address(lpToken));
-    }
-
-    function _update(address from, address to, uint256 value) internal virtual override {
-        // will revert for normal transfer till goal not reached
-        if (
-            !liquidityGoalReached() && from != address(0) && to != address(0) && from != address(this)
-                && to != address(this) && !isLpCreated
-        ) {
-            revert TransferNotAllowedUntilLiquidityGoalReached();
-        }
-        super._update(from, to, value);
     }
 }
