@@ -136,7 +136,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         return tokensToReceive;
     }
 
-    function sellTokens(uint256 tokenAmount, uint256 minExpectedEth) external nonReentrant returns (uint256) {
+    function sellTokens(uint256 tokenAmount, uint256 minExpectedEth) external nonReentrant {
         if (liquidityGoalReached() || isLpCreated) revert LiquidityGoalReached();
         if (tokenAmount == 0) revert NeedToSellTokens();
 
@@ -242,7 +242,6 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         emit PairCreated(amount1, amount0, liquidity, pool);
     }
 
-    // Calculate sqrtPriceX96 for pool initialization
     function _getSqrtPriceX96(uint256 amountToken, uint256 amountWETH) internal pure returns (uint160) {
         if (amountWETH == 0) revert DivisionByZero();
         // sqrtPriceX96 = sqrt(amountToken / amountWETH) * 2^96
