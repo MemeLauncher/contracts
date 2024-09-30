@@ -3,13 +3,15 @@ pragma solidity ^0.8.25;
 
 import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { IJoeRouter02 } from "./interfaces/IJoeRouter02.sol";
-import { IUniswapV2Router02 } from "./interfaces/IUniswapV2Router02.sol";
-import { IFactory } from "./interfaces/IFactory.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
 import { IWETH } from "./interfaces/IWETH.sol";
-import { IPair } from "./interfaces/IPair.sol";
-import { LP_POOL } from "./BondingERC20TokenFactory.sol";
+import { IUniswapV3Factory } from "./interfaces/IUniswapV3Factory.sol";
+import { IUniswapV3Pool } from "./interfaces/IUniswapV3Pool.sol";
+import { INonfungiblePositionManager } from "./interfaces/INonfungiblePositionManager.sol";
+import { TickMath } from "./libraries/TickMath.sol";
+import { IContinuousBondingERC20Token } from "./interfaces/IContinuousBondingERC20Token.sol";
+import { IBondingERC20TokenFactory } from "./interfaces/IBondingERC20TokenFactory.sol";
+import { FixedPoint96 } from "./libraries/FixedPoint96.sol";
 
 event TokensBought(address indexed buyer, uint256 ethAmount, uint256 tokenBought, uint256 feeEarnedByTreasury);
 
@@ -29,16 +31,16 @@ error InvalidSender();
 error LPCanNotBeCreated();
 error LiquidityGoalReached();
 error InSufficientAmountReceived();
+error DivisionByZero();
 
-contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
+contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, ReentrancyGuard {
     uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
 
     IBondingCurve public immutable bondingCurve;
-    address public immutable router;
-    IFactory public immutable factory;
     address public immutable TREASURY_ADDRESS;
+    address public immutable factory;
 
     uint256 public initialTokenBalance;
     uint256 public ethBalance;
@@ -47,10 +49,13 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
     uint256 public sellFee;
     uint256 public treasuryClaimableEth;
     bool public isLpCreated;
-    LP_POOL public poolType;
+
+    IUniswapV3Factory public immutable uniswapV3Factory;
+    INonfungiblePositionManager public immutable nonfungiblePositionManager;
+    address public immutable WETH;
 
     constructor(
-        address _router,
+        address _factory,
         string memory _name,
         string memory _symbol,
         address _treasury,
@@ -59,12 +64,13 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         IBondingCurve _bondingCurve,
         uint256 _initialTokenBalance,
         uint256 _availableTokenBalance,
-        LP_POOL _poolType
+        address _uniswapV3Factory,
+        address _nonfungiblePositionManager,
+        address _WETH
     )
         ERC20(_name, _symbol)
     {
-        router = _router;
-        factory = IFactory(IJoeRouter02(router).factory());
+        factory = _factory;
         TREASURY_ADDRESS = _treasury;
         buyFee = _buyFee;
         sellFee = _sellFee;
@@ -73,7 +79,9 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         initialTokenBalance = _initialTokenBalance;
         ethBalance = _initialTokenBalance;
         availableTokenBalance = _availableTokenBalance;
-        poolType = _poolType;
+        uniswapV3Factory = IUniswapV3Factory(_uniswapV3Factory);
+        nonfungiblePositionManager = INonfungiblePositionManager(_nonfungiblePositionManager);
+        WETH = _WETH;
     }
 
     function buyTokens(uint256 minExpectedAmount) external payable nonReentrant returns (uint256) {
@@ -117,9 +125,9 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         }
 
         if (treasuryClaimableEth >= 0.1 ether) {
-            (bool sent,) = TREASURY_ADDRESS.call{ value: treasuryClaimableEth }("");
+            (bool treasurySent,) = TREASURY_ADDRESS.call{ value: treasuryClaimableEth }("");
             treasuryClaimableEth = 0;
-            if (!sent) {
+            if (!treasurySent) {
                 revert FailedToSendETH();
             }
         }
@@ -150,9 +158,9 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         if (!sent) revert FailedToSendETH();
 
         if (treasuryClaimableEth >= 0.1 ether) {
-            (bool sent,) = TREASURY_ADDRESS.call{ value: treasuryClaimableEth }("");
+            (bool treasurySent,) = TREASURY_ADDRESS.call{ value: treasuryClaimableEth }("");
             treasuryClaimableEth = 0;
-            if (!sent) {
+            if (!treasurySent) {
                 revert FailedToSendETH();
             }
         }
@@ -201,35 +209,38 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
         currentEth = currentEth > address(this).balance ? address(this).balance : currentEth;
         isLpCreated = true;
 
-        //is this line necessary? can be removed
-        // _approve(address(this), address(router), currentTokenBalance);
+        // Create the pool if it doesn't exist
+        (address token0, address token1) = address(this) < WETH ? (address(this), WETH) : (WETH, address(this));
+        address pool = nonfungiblePositionManager.createAndInitializePoolIfNecessary(token0, token1, 30000, _getSqrtPriceX96(currentEth, currentTokenBalance));
 
-        address wNative;
-        uint256 liquidity;
-        if (poolType == LP_POOL.Uniswap) {
-            wNative = IUniswapV2Router02(router).WETH();
+        // Approve the position manager to spend tokens
+        _approve(address(this), address(nonfungiblePositionManager), currentTokenBalance);
+        IWETH(WETH).deposit{value: currentEth}();
+        IWETH(WETH).approve(address(nonfungiblePositionManager), currentEth);
 
-            address pair = factory.getPair(address(this), wNative);
-            if (pair == address(0)) pair = factory.createPair(address(this), wNative);
-            IWETH(wNative).deposit{ value: currentEth }();
-            IWETH(wNative).transfer(pair, currentEth);
-            _transfer(address(this), pair, currentTokenBalance);
-            liquidity = IPair(pair).mint(address(this));
-        } else if (poolType == LP_POOL.TraderJoe) {
-            wNative = IJoeRouter02(router).WAVAX();
+        // Add liquidity
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: address(this),
+            token1: WETH,
+            fee: 3000,
+            tickLower: TickMath.MIN_TICK,
+            tickUpper: TickMath.MAX_TICK,
+            amount0Desired: currentTokenBalance,
+            amount1Desired: currentEth,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: address(this),
+            deadline: block.timestamp
+        });
 
-            address pair = factory.getPair(address(this), wNative);
-            if (pair == address(0)) pair = factory.createPair(address(this), wNative);
-            IWETH(wNative).deposit{ value: currentEth }();
-            IWETH(wNative).transfer(pair, currentEth);
-            _transfer(address(this), pair, currentTokenBalance);
-            liquidity = IPair(pair).mint(address(this));
+        (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = nonfungiblePositionManager.mint(params);
+
+        // Transfer the NFT to the treasury if feeRecipient is not zero
+        if (IBondingERC20TokenFactory(factory).feeRecipient() != address(0)) {
+            nonfungiblePositionManager.transferFrom(address(this), TREASURY_ADDRESS, tokenId);
         }
-        // Burn the LP tokens received
-        IERC20 lpToken = IERC20(factory.getPair(address(this), wNative));
-        lpToken.transfer(BURN_ADDRESS, liquidity);
 
-        emit PairCreated(currentEth, currentTokenBalance, liquidity, address(lpToken));
+        emit PairCreated(amount1, amount0, liquidity, pool);
     }
 
     function _update(address from, address to, uint256 value) internal virtual override {
@@ -241,5 +252,23 @@ contract ContinuosBondingERC20Token is ERC20, ReentrancyGuard {
             revert TransferNotAllowedUntilLiquidityGoalReached();
         }
         super._update(from, to, value);
+    }
+
+    // Calculate sqrtPriceX96 for pool initialization
+    function _getSqrtPriceX96(uint256 amountToken, uint256 amountWETH) internal pure returns (uint160) {
+        if (amountWETH == 0) revert DivisionByZero();
+        // sqrtPriceX96 = sqrt(amountToken / amountWETH) * 2^96
+        uint256 price = amountToken / amountWETH; // Token price relative to WETH
+       uint256 sqrtPrice = _sqrt(price) * 2**96;
+        return uint160(sqrtPrice);
+    }
+
+    function _sqrt(uint256 x) internal pure returns (uint256 y) {
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
     }
 }
