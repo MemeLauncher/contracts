@@ -19,6 +19,9 @@ contract BondingERC20TokenFactoryTest is Test {
   uint256 internal initialTokenBalance = 50 * 10 ** 18;
   uint256 internal buyFee = 100;
   uint256 internal sellFee = 100;
+  address internal uniswapV3Factory = makeAddr("uniswapV3Factory");
+  address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
+  address internal WETH = makeAddr("WETH");
 
   function setUp() public {
     uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 19_876_830);
@@ -33,7 +36,10 @@ contract BondingERC20TokenFactoryTest is Test {
       initialTokenBalance,
       availableTokenBalance,
       buyFee,
-      sellFee
+      sellFee,
+      uniswapV3Factory,
+      nonfungiblePositionManager,
+      WETH
     );
   }
 
@@ -41,7 +47,7 @@ contract BondingERC20TokenFactoryTest is Test {
     address bondingERC20Token = factory.deployBondingERC20Token("ERC20Token", "ERC20");
 
     assertNotEq(bondingERC20Token, address(0));
-    assertEq(IContinuousBondingERC20Token(bondingERC20Token).bondingCurve(), address(bondingCurve));
+    assertEq(address(IContinuousBondingERC20Token(bondingERC20Token).bondingCurve()), address(bondingCurve));
     assertEq(IContinuousBondingERC20Token(bondingERC20Token).TREASURY_ADDRESS(), treasury);
     assertEq(IContinuousBondingERC20Token(bondingERC20Token).availableTokenBalance(), availableTokenBalance);
     assertEq(IContinuousBondingERC20Token(bondingERC20Token).initialTokenBalance(), initialTokenBalance);
@@ -56,8 +62,14 @@ contract BondingERC20TokenFactoryTest is Test {
 
     address bondingERC20TokenNewBondingCurve = factory.deployBondingERC20Token("ERC20Token", "ERC20");
 
-    assertEq(IContinuousBondingERC20Token(bondingERC20TokenOldBondingCurve).bondingCurve(), address(bondingCurve));
-    assertEq(IContinuousBondingERC20Token(bondingERC20TokenNewBondingCurve).bondingCurve(), address(newBondingCurve));
+    assertEq(
+      address(IContinuousBondingERC20Token(bondingERC20TokenOldBondingCurve).bondingCurve()),
+      address(bondingCurve)
+    );
+    assertEq(
+      address(IContinuousBondingERC20Token(bondingERC20TokenNewBondingCurve).bondingCurve()),
+      address(newBondingCurve)
+    );
   }
 
   function testUpdateBondingCurveFail() public {
