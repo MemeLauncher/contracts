@@ -4,119 +4,105 @@ pragma solidity ^0.8.25;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ContinuosBondingERC20Token } from "./ContinuosBondingERC20Token.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
+import { IBondingERC20TokenFactory } from "./interfaces/IBondingERC20TokenFactory.sol";
 
-event BondingCurveUpdated(address indexed newBondingCurve, address indexed oldBondingCurve);
+contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
+  IBondingCurve public bondingCurve;
+  address public immutable WETH;
+  address public treasury;
+  address public uniswapV3Factory;
+  address public nonfungiblePositionManager;
+  address public feeRecipient;
+  uint256 public initialTokenBalance;
+  uint256 public availableTokenBalance;
+  uint256 public buyFee;
+  uint256 public sellFee;
 
-event TreasuryUpdated(address indexed newTreasury, address indexed oldTreasury);
+  constructor(
+    address _owner,
+    IBondingCurve _bondingCurve,
+    address _treasury,
+    uint256 _initialTokenBalance,
+    uint256 _availableTokenBalance,
+    uint256 _buyFee,
+    uint256 _sellFee,
+    address _uniswapV3Factory,
+    address _nonfungiblePositionManager,
+    address _WETH
+  ) Ownable(_owner) {
+    bondingCurve = _bondingCurve;
+    treasury = _treasury;
+    initialTokenBalance = _initialTokenBalance;
+    availableTokenBalance = _availableTokenBalance;
+    buyFee = _buyFee;
+    sellFee = _sellFee;
+    uniswapV3Factory = _uniswapV3Factory;
+    nonfungiblePositionManager = _nonfungiblePositionManager;
+    WETH = _WETH;
+  }
 
-event AvailableTokenUpdated(uint256 indexed newAvailableToken, uint256 indexed oldAvailableToken);
+  function deployBondingERC20Token(string memory _name, string memory _symbol) public returns (address) {
+    ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
+      address(this),
+      _name,
+      _symbol,
+      treasury,
+      buyFee,
+      sellFee,
+      bondingCurve,
+      initialTokenBalance,
+      availableTokenBalance,
+      uniswapV3Factory,
+      nonfungiblePositionManager,
+      WETH
+    );
+    emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
-event InitialTokenBalanceUpdated(uint256 indexed newInitialTokenBalance, uint256 indexed oldInitialTokenBalance);
+    return address(_bondingERC20Token);
+  }
 
-event BuyFeeUpdated(uint256 indexed newBuyFee, uint256 indexed oldBuyFee);
+  function updateBuyFee(uint256 _newBuyFee) public onlyOwner {
+    emit BuyFeeUpdated(_newBuyFee, buyFee);
+    buyFee = _newBuyFee;
+  }
 
-event SellFeeUpdated(uint256 indexed newSellFee, uint256 indexed oldSellFee);
+  function updateSellFee(uint256 _newSellFee) public onlyOwner {
+    emit SellFeeUpdated(_newSellFee, sellFee);
+    sellFee = _newSellFee;
+  }
 
-event TokenDeployed(address indexed token, address indexed deployer);
+  function updateTreasury(address _newTreasury) public onlyOwner {
+    emit TreasuryUpdated(_newTreasury, treasury);
+    treasury = _newTreasury;
+  }
 
-event RouterUpdated(address indexed router, bool allowed);
+  function updateAvailableTokenBalance(uint256 _newAvailableTokenBalance) public onlyOwner {
+    emit AvailableTokenUpdated(_newAvailableTokenBalance, availableTokenBalance);
+    availableTokenBalance = _newAvailableTokenBalance;
+  }
 
-error RouterNotSet();
+  function updateInitialTokenBalance(uint256 _newInitialTokenBalance) public onlyOwner {
+    emit InitialTokenBalanceUpdated(_newInitialTokenBalance, initialTokenBalance);
+    initialTokenBalance = _newInitialTokenBalance;
+  }
 
-enum LP_POOL {
-    Uniswap,
-    TraderJoe
-}
+  function updateBondingCurve(IBondingCurve _newBondingCurve) public onlyOwner {
+    emit BondingCurveUpdated(address(_newBondingCurve), address(bondingCurve));
+    bondingCurve = _newBondingCurve;
+  }
 
-contract BondingERC20TokenFactory is Ownable {
-    IBondingCurve public bondingCurve;
-    address public treasury;
-    uint256 public initialTokenBalance;
-    uint256 public availableTokenBalance;
-    uint256 public buyFee;
-    uint256 public sellFee;
-    mapping(address router => bool allowed) public allowedRouter;
+  function updateUniswapV3Factory(address _newUniswapV3Factory) public onlyOwner {
+    emit UniswapV3FactoryUpdated(_newUniswapV3Factory, uniswapV3Factory);
+    uniswapV3Factory = _newUniswapV3Factory;
+  }
 
-    constructor(
-        address _owner,
-        IBondingCurve _bondingCurve,
-        address _treasury,
-        uint256 _initialTokenBalance,
-        uint256 _availableTokenBalance,
-        uint256 _buyFee,
-        uint256 _sellFee
-    )
-        Ownable(_owner)
-    {
-        bondingCurve = _bondingCurve;
-        treasury = _treasury;
-        initialTokenBalance = _initialTokenBalance;
-        availableTokenBalance = _availableTokenBalance;
-        buyFee = _buyFee;
-        sellFee = _sellFee;
-    }
+  function updateNonfungiblePositionManager(address _newNonfungiblePositionManager) public onlyOwner {
+    emit NonfungiblePositionManagerUpdated(_newNonfungiblePositionManager, nonfungiblePositionManager);
+    nonfungiblePositionManager = _newNonfungiblePositionManager;
+  }
 
-    function deployBondingERC20Token(
-        address _router,
-        string memory _name,
-        string memory _symbol,
-        LP_POOL _poolType
-    )
-        public
-        returns (address)
-    {
-        if (!allowedRouter[_router]) {
-            revert RouterNotSet();
-        }
-        ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
-            _router,
-            _name,
-            _symbol,
-            treasury,
-            buyFee,
-            sellFee,
-            bondingCurve,
-            initialTokenBalance,
-            availableTokenBalance,
-            _poolType
-        );
-        emit TokenDeployed(address(_bondingERC20Token), msg.sender);
-
-        return address(_bondingERC20Token);
-    }
-
-    function updateRouter(address _router, bool _allowed) public onlyOwner {
-        emit RouterUpdated(_router, _allowed);
-        allowedRouter[_router] = _allowed;
-    }
-
-    function updateBuyFee(uint256 _newBuyFee) public onlyOwner {
-        emit BuyFeeUpdated(_newBuyFee, buyFee);
-        buyFee = _newBuyFee;
-    }
-
-    function updateSellFee(uint256 _newSellFee) public onlyOwner {
-        emit SellFeeUpdated(_newSellFee, sellFee);
-        sellFee = _newSellFee;
-    }
-
-    function updateTreasury(address _newTreasury) public onlyOwner {
-        emit TreasuryUpdated(_newTreasury, treasury);
-        treasury = _newTreasury;
-    }
-
-    function updateAvailableTokenBalance(uint256 _newAvailableTokenBalance) public onlyOwner {
-        emit AvailableTokenUpdated(_newAvailableTokenBalance, availableTokenBalance);
-        availableTokenBalance = _newAvailableTokenBalance;
-    }
-
-    function updateInitialTokenBalance(uint256 _newInitialTokenBalance) public onlyOwner {
-        emit InitialTokenBalanceUpdated(_newInitialTokenBalance, initialTokenBalance);
-        initialTokenBalance = _newInitialTokenBalance;
-    }
-
-    function updateBondingCurve(IBondingCurve _newBondingCurve) public onlyOwner {
-        emit BondingCurveUpdated(address(_newBondingCurve), address(bondingCurve));
-        bondingCurve = _newBondingCurve;
-    }
+  function updateFeeRecipient(address _newFeeRecipient) public onlyOwner {
+    emit FeeRecipientUpdated(_newFeeRecipient, feeRecipient);
+    feeRecipient = _newFeeRecipient;
+  }
 }
