@@ -21,7 +21,15 @@ event TokenDeployed(address indexed token, address indexed deployer);
 
 event RouterUpdated(address indexed router, bool allowed);
 
+event CreationFeeUpdated(uint256 indexed newCreationFee, uint256 indexed oldCreationFee);
+
+event FeesSent(uint256 fees);
+
 error RouterNotSet();
+
+error InvalidCreationFee();
+
+error FeeSendingFailed();
 
 enum LP_POOL {
     Uniswap,
@@ -35,6 +43,7 @@ contract BondingERC20TokenFactory is Ownable {
     uint256 public availableTokenBalance;
     uint256 public buyFee;
     uint256 public sellFee;
+    uint256 public creationFee;
     mapping(address router => bool allowed) public allowedRouter;
 
     constructor(
@@ -44,7 +53,8 @@ contract BondingERC20TokenFactory is Ownable {
         uint256 _initialTokenBalance,
         uint256 _availableTokenBalance,
         uint256 _buyFee,
-        uint256 _sellFee
+        uint256 _sellFee,
+        uint256 _creationFee
     )
         Ownable(_owner)
     {
@@ -54,6 +64,7 @@ contract BondingERC20TokenFactory is Ownable {
         availableTokenBalance = _availableTokenBalance;
         buyFee = _buyFee;
         sellFee = _sellFee;
+        creationFee = _creationFee;
     }
 
     function deployBondingERC20Token(
@@ -63,10 +74,14 @@ contract BondingERC20TokenFactory is Ownable {
         LP_POOL _poolType
     )
         public
+        payable
         returns (address)
     {
         if (!allowedRouter[_router]) {
             revert RouterNotSet();
+        }
+        if (msg.value < creationFee) {
+            revert InvalidCreationFee();
         }
         ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
             _router,
@@ -83,6 +98,14 @@ contract BondingERC20TokenFactory is Ownable {
         emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
         return address(_bondingERC20Token);
+    }
+
+    function claimFees() public onlyOwner {
+        emit FeesSent(address(this).balance);
+        (bool success, ) = treasury.call{value: address(this).balance}("");
+        if (!success) {
+            revert FeeSendingFailed();
+        }
     }
 
     function updateRouter(address _router, bool _allowed) public onlyOwner {
@@ -118,5 +141,10 @@ contract BondingERC20TokenFactory is Ownable {
     function updateBondingCurve(IBondingCurve _newBondingCurve) public onlyOwner {
         emit BondingCurveUpdated(address(_newBondingCurve), address(bondingCurve));
         bondingCurve = _newBondingCurve;
+    }
+
+    function updateCreationFee(uint256 newCreationFee) public onlyOwner {
+        emit CreationFeeUpdated(newCreationFee, creationFee);
+        creationFee = newCreationFee;
     }
 }
