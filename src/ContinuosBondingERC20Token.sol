@@ -31,6 +31,7 @@ error LPCanNotBeCreated();
 error LiquidityGoalReached();
 error InSufficientAmountReceived();
 error DivisionByZero();
+error TransferToUniswapV3PoolsAreNotAllowed();
 
 contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, ReentrancyGuard {
     uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
@@ -210,11 +211,15 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
 
         // Create the pool if it doesn't exist
         (address token0, address token1) = address(this) < WETH ? (address(this), WETH) : (WETH, address(this));
-        address pool = nonfungiblePositionManager.createAndInitializePoolIfNecessary(token0, token1, 30000, _getSqrtPriceX96(currentEth, currentTokenBalance));
+        (uint256 amountOfToken0, uint256 amountOfToken1) =
+            (token0 == address(this)) ? (currentTokenBalance, currentEth) : (currentEth, currentTokenBalance);
+        address pool = nonfungiblePositionManager.createAndInitializePoolIfNecessary(
+            token0, token1, 3000, _getSqrtPriceX96(amountOfToken0, amountOfToken1)
+        );
 
         // Approve the position manager to spend tokens
         _approve(address(this), address(nonfungiblePositionManager), currentTokenBalance);
-        IWETH(WETH).deposit{value: currentEth}();
+        IWETH(WETH).deposit{ value: currentEth }();
         IWETH(WETH).approve(address(nonfungiblePositionManager), currentEth);
 
         // Add liquidity
@@ -228,25 +233,36 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
             amount1Desired: currentEth,
             amount0Min: 0,
             amount1Min: 0,
-            recipient: address(this),
+            recipient: IBondingERC20TokenFactory(factory).feeRecipient() != address(0)
+                ? IBondingERC20TokenFactory(factory).feeRecipient()
+                : address(this),
             deadline: block.timestamp
         });
 
         (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = nonfungiblePositionManager.mint(params);
 
-        // Transfer the NFT to the treasury if feeRecipient is not zero
-        if (IBondingERC20TokenFactory(factory).feeRecipient() != address(0)) {
-            nonfungiblePositionManager.transferFrom(address(this), TREASURY_ADDRESS, tokenId);
-        }
-
         emit PairCreated(amount1, amount0, liquidity, pool);
     }
 
-    function _getSqrtPriceX96(uint256 amountToken, uint256 amountWETH) internal pure returns (uint160) {
-        if (amountWETH == 0) revert DivisionByZero();
-        // sqrtPriceX96 = sqrt(amountToken / amountWETH) * 2^96
-        uint256 price = amountToken / amountWETH; // Token price relative to WETH
-       uint256 sqrtPrice = _sqrt(price) * 2**96;
+    function _update(address from, address to, uint256 value) internal virtual override {
+        if (
+            !liquidityGoalReached() && from != address(0) && to != address(0) && from != address(this)
+                && to != address(this) && !isLpCreated
+        ) {
+            (address token0, address token1) = address(this) < WETH ? (address(this), WETH) : (WETH, address(this));
+            address pool = IUniswapV3Factory(uniswapV3Factory).getPool(token0, token1, 3000);
+
+            if (to == address(uniswapV3Factory) || to == address(nonfungiblePositionManager) || to == pool) {
+                revert TransferToUniswapV3PoolsAreNotAllowed();
+            }
+        }
+        super._update(from, to, value);
+    }
+
+    function _getSqrtPriceX96(uint256 amountOfToken0, uint256 amountOfToken1) internal pure returns (uint160) {
+        if (amountOfToken0 == 0) revert DivisionByZero();
+        uint256 price = amountOfToken1 * (2 ** 96) * (2 ** 96) / amountOfToken0;
+        uint256 sqrtPrice = _sqrt(price);
         return uint160(sqrtPrice);
     }
 
