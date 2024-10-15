@@ -222,6 +222,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         IWETH(WETH).deposit{ value: currentEth }();
         IWETH(WETH).approve(address(nonfungiblePositionManager), currentEth);
 
+        address feeRecipient = IBondingERC20TokenFactory(factory).feeRecipient();
+
         // Add liquidity
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: address(this),
@@ -233,8 +235,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
             amount1Desired: currentEth,
             amount0Min: 0,
             amount1Min: 0,
-            recipient: IBondingERC20TokenFactory(factory).feeRecipient() != address(0)
-                ? IBondingERC20TokenFactory(factory).feeRecipient()
+            recipient: feeRecipient != address(0)
+                ? feeRecipient
                 : address(this),
             deadline: block.timestamp
         });
