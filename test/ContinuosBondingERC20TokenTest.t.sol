@@ -22,6 +22,7 @@ contract ContinuosBondingERC20TokenTest is Test {
   uint256 internal MAX_TOTAL_SUPPLY = 1_000_000_000 ether;
   uint256 internal buyFee = 100;
   uint256 internal sellFee = 100;
+  uint256 internal creationFee = 0;
 
   address internal uniswapV3Factory = makeAddr("uniswapV3Factory");
   address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
@@ -43,6 +44,7 @@ contract ContinuosBondingERC20TokenTest is Test {
       availableTokenBalance,
       buyFee,
       sellFee,
+      creationFee,
       uniswapV3Factory,
       nonfungiblePositionManager,
       WETH

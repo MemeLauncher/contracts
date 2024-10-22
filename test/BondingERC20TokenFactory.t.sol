@@ -19,6 +19,7 @@ contract BondingERC20TokenFactoryTest is Test {
   uint256 internal initialTokenBalance = 50 * 10 ** 18;
   uint256 internal buyFee = 100;
   uint256 internal sellFee = 100;
+  uint256 internal creationFee = 0;
   address internal uniswapV3Factory = makeAddr("uniswapV3Factory");
   address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
   address internal WETH = makeAddr("WETH");
@@ -37,6 +38,7 @@ contract BondingERC20TokenFactoryTest is Test {
       availableTokenBalance,
       buyFee,
       sellFee,
+      creationFee,
       uniswapV3Factory,
       nonfungiblePositionManager,
       WETH
@@ -70,6 +72,25 @@ contract BondingERC20TokenFactoryTest is Test {
       address(IContinuousBondingERC20Token(bondingERC20TokenNewBondingCurve).bondingCurve()),
       address(newBondingCurve)
     );
+  }
+
+  function testCreationFee() public {
+    vm.prank(owner);
+    factory.updateCreationFee(0.01 ether);
+
+    vm.expectRevert();
+    factory.deployBondingERC20Token{value: 0.001 ether}("ERC20Token", "ERC20");
+
+    factory.deployBondingERC20Token{value: 0.01 ether}("ERC20Token", "ERC20");
+
+    uint256 treasuryBalanceBefore = treasury.balance;
+
+    vm.prank(owner);
+    factory.claimFees();
+
+    uint256 treasuryBalanceAfter = treasury.balance;
+
+    assertEq(treasuryBalanceAfter - treasuryBalanceBefore, 0.01 ether);
   }
 
   function testUpdateBondingCurveFail() public {

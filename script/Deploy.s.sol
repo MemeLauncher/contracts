@@ -23,6 +23,7 @@ contract Deploy is BaseScript {
       800_000_000 ether,
       100,
       100,
+      0, //// creation fee
       UNISWAP_V3_FACTORY,
       NON_FUNGIBLE_POSITION_MANAGER,
       WETH
