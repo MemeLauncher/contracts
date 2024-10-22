@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import { LP_POOL } from "../BondingERC20TokenFactory.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IBondingCurve } from "./IBondingCurve.sol";
 
-interface IContinuousBondingERC20Token {
-    function bondingCurve() external returns (address);
-    function TREASURY_ADDRESS() external returns (address);
-    function availableTokenBalance() external returns (uint256);
-    function initialTokenBalance() external returns (uint256);
-    function totalEthContributed() external returns (uint256);
-    function isLpCreated() external returns (bool);
-    function poolType() external returns (LP_POOL);
+interface IContinuousBondingERC20Token is IERC20 {
+  function bondingCurve() external returns (IBondingCurve);
+
+  function TREASURY_ADDRESS() external returns (address);
+
+  function availableTokenBalance() external returns (uint256);
+
+  function initialTokenBalance() external returns (uint256);
+
+  function totalEthContributed() external returns (uint256);
+
+  function isLpCreated() external returns (bool);
 }
