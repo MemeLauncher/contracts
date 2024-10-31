@@ -6,6 +6,9 @@ import { ContinuosBondingERC20Token } from "./ContinuosBondingERC20Token.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
 import { IBondingERC20TokenFactory } from "./interfaces/IBondingERC20TokenFactory.sol";
 
+error InvalidCreationFee();
+error FeeSendingFailed();
+
 contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
   IBondingCurve public bondingCurve;
   address public immutable WETH;
@@ -17,6 +20,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
   uint256 public availableTokenBalance;
   uint256 public buyFee;
   uint256 public sellFee;
+  uint256 public creationFee;
 
   constructor(
     address _owner,
@@ -26,6 +30,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     uint256 _availableTokenBalance,
     uint256 _buyFee,
     uint256 _sellFee,
+    uint256 _creationFee,
     address _uniswapV3Factory,
     address _nonfungiblePositionManager,
     address _WETH
@@ -36,12 +41,16 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     availableTokenBalance = _availableTokenBalance;
     buyFee = _buyFee;
     sellFee = _sellFee;
+    creationFee = _creationFee;
     uniswapV3Factory = _uniswapV3Factory;
     nonfungiblePositionManager = _nonfungiblePositionManager;
     WETH = _WETH;
   }
 
-  function deployBondingERC20Token(string memory _name, string memory _symbol) public returns (address) {
+  function deployBondingERC20Token(string memory _name, string memory _symbol) public payable returns (address) {
+    if (msg.value < creationFee) {
+        revert InvalidCreationFee();
+    }
     ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
       address(this),
       _name,
@@ -59,6 +68,19 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
     return address(_bondingERC20Token);
+  }
+
+  function claimFees() public onlyOwner {
+    emit FeesSent(address(this).balance);
+    (bool success, ) = treasury.call{value: address(this).balance}("");
+    if (!success) {
+        revert FeeSendingFailed();
+    }
+  }
+
+  function updateCreationFee(uint256 newCreationFee) public onlyOwner {
+    emit CreationFeeUpdated(newCreationFee, creationFee);
+    creationFee = newCreationFee;
   }
 
   function updateBuyFee(uint256 _newBuyFee) public onlyOwner {

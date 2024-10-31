@@ -18,6 +18,8 @@ interface IBondingERC20TokenFactory {
     address indexed oldNonfungiblePositionManager
   );
   event FeeRecipientUpdated(address indexed newFeeRecipient, address indexed oldFeeRecipient);
+  event CreationFeeUpdated(uint256 indexed newCreationFee, uint256 indexed oldCreationFee);
+  event FeesSent(uint256 fees);
 
   // Public view functions
   function bondingCurve() external view returns (IBondingCurve);
@@ -41,7 +43,7 @@ interface IBondingERC20TokenFactory {
   function sellFee() external view returns (uint256);
 
   // Public functions
-  function deployBondingERC20Token(string memory _name, string memory _symbol) external returns (address);
+  function deployBondingERC20Token(string memory _name, string memory _symbol) external payable returns (address);
 
   function updateBuyFee(uint256 _newBuyFee) external;
 
