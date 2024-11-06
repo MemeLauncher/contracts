@@ -10,6 +10,8 @@ import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import { INonfungiblePositionManager } from "./interfaces/INonfungiblePositionManager.sol";
 
+event FeesClaimed(address indexed claimer, uint256[] snapshotIds, uint256 apeTokenAmount, address[] candyTokens, uint256[] tokenIds, uint256[] candyTokenAmounts);
+
 contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
     using ECDSA for bytes32;
 
@@ -33,18 +35,20 @@ contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
     }
 
     function claimFees(
+        uint256[] calldata snapshotIds, //// the source of data
         uint256[] calldata tokenIds, //// array of positionId
         address[] calldata candyTokens, //// array of candyToken addresses
         uint256[] calldata candyTokenAmounts, //// amount of candyToken to be claimed by caller
         uint256 apeTokenAmount, //// amount of apeToken to be claimed by caller
         bytes calldata signature //// signature of above data signed by trusted signer
+     
     )
         external
         nonReentrant
     {
         require(tokenIds.length == candyTokenAmounts.length, "length mismatch");
 
-        bytes32 digest = getDigest(msg.sender, candyTokens, tokenIds, candyTokenAmounts, apeTokenAmount);
+        bytes32 digest = getDigest(msg.sender, candyTokens, tokenIds, candyTokenAmounts, snapshotIds, apeTokenAmount);
 
         require(SignatureChecker.isValidSignatureNow(signer, digest, signature), "invalid signature");
         uint256 amountOfWNativeClaimable = apeTokenAmount - claimed[msg.sender][wNative];
@@ -79,6 +83,8 @@ contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
             IERC20(candyToken).transfer(msg.sender, claimableCandyAmount);
         }
         IERC20(wNative).transfer(msg.sender, amountOfWNativeClaimable);
+
+        emit FeesClaimed(msg.sender, snapshotIds, apeTokenAmount, candyTokens, tokenIds, candyTokenAmounts);
     }
 
     function getDigest(
@@ -86,7 +92,9 @@ contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
         address[] calldata candyTokens,
         uint256[] calldata tokenIds,
         uint256[] calldata candyTokenAmounts,
+        uint256[] calldata snapshotIds,
         uint256 apeTokenAmounts
+     
     )
         public
         view
@@ -96,12 +104,13 @@ contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
             keccak256(
                 abi.encode(
                     keccak256(
-                        "Claimer(address claimer,address[] candyTokens,uint256[] tokenIds,uint256[] candyTokenAmounts,uint256 apeTokenAmounts)"
+                        "Claimer(address claimer,address[] candyTokens,uint256[] tokenIds,uint256[] candyTokenAmounts,uint256 apeTokenAmounts,uint256[] calldata snapshotIds)"
                     ),
                     claimer,
                     keccak256(abi.encode(candyTokens)),
                     keccak256(abi.encode(tokenIds)),
                     keccak256(abi.encode(candyTokenAmounts)),
+                    keccak256(abi.encode(snapshotIds)),
                     apeTokenAmounts
                 )
             )
