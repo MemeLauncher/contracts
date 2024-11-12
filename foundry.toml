@@ -21,6 +21,7 @@
   verbosity = 4
 
 [etherscan]
+  mainnet = { key = "${ETHERSCAN_API_KEY}" }    
 
 [fmt]
   bracket_spacing = true
