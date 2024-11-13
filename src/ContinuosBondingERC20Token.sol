@@ -216,6 +216,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         address pool = nonfungiblePositionManager.createAndInitializePoolIfNecessary(
             token0, token1, 3000, _getSqrtPriceX96(amountOfToken0, amountOfToken1)
         );
+        int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
         // Approve the position manager to spend tokens
         _approve(address(this), address(nonfungiblePositionManager), currentTokenBalance);
@@ -224,15 +225,21 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
 
         address feeRecipient = IBondingERC20TokenFactory(factory).feeRecipient();
 
+        int24 tickLower = -887272;
+        int24 tickUpper = -tickLower;
+
+        tickLower=-(-tickLower/tickSpacing*tickSpacing);
+        tickUpper=tickUpper/tickSpacing*tickSpacing;
+
         // Add liquidity
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
-            token0: address(this),
-            token1: WETH,
+            token0: token0,
+            token1: token1,
             fee: 3000,
-            tickLower: TickMath.MIN_TICK,
-            tickUpper: TickMath.MAX_TICK,
-            amount0Desired: currentTokenBalance,
-            amount1Desired: currentEth,
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            amount0Desired: amountOfToken0,
+            amount1Desired: amountOfToken1,
             amount0Min: 0,
             amount1Min: 0,
             recipient: feeRecipient != address(0)

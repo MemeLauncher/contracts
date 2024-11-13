@@ -6,4 +6,6 @@ interface IUniswapV3Pool {
   /// @dev Price is represented as a sqrt(amountToken1/amountToken0) Q64.96 value
   /// @param sqrtPriceX96 the initial sqrt price of the pool as a Q64.96
   function initialize(uint160 sqrtPriceX96) external;
+
+  function tickSpacing() external returns(int24);
 }
