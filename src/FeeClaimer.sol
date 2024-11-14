@@ -10,6 +10,9 @@ import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import { INonfungiblePositionManager } from "./interfaces/INonfungiblePositionManager.sol";
 
+event FeesClaimed(address indexed claimer, uint256[] snapshotIds, uint256 apeTokenAmount, address[] candyTokens, uint256[] tokenIds, uint256[] candyTokenAmounts);
+
+
 contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
     using ECDSA for bytes32;
 
@@ -33,6 +36,7 @@ contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
     }
 
     function claimFees(
+        uint256[] calldata snapshotIds, //// array of snapshotId
         uint256[] calldata tokenIds, //// array of positionId
         address[] calldata candyTokens, //// array of candyToken addresses
         uint256[] calldata candyTokenAmounts, //// amount of candyToken to be claimed by caller
@@ -79,6 +83,8 @@ contract FeeClaimer is Ownable, EIP712, ReentrancyGuard {
             IERC20(candyToken).transfer(msg.sender, claimableCandyAmount);
         }
         IERC20(wNative).transfer(msg.sender, amountOfWNativeClaimable);
+        
+        emit FeesClaimed(msg.sender, snapshotIds, apeTokenAmount, candyTokens, tokenIds, candyTokenAmounts);
     }
 
     function getDigest(
