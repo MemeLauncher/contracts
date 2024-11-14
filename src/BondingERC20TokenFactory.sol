@@ -5,6 +5,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ContinuosBondingERC20Token } from "./ContinuosBondingERC20Token.sol";
 import { IBondingCurve } from "./interfaces/IBondingCurve.sol";
 import { IBondingERC20TokenFactory } from "./interfaces/IBondingERC20TokenFactory.sol";
+import {IContinuousBondingERC20Token} from "./interfaces/IContinuousBondingERC20Token.sol";
 
 error InvalidCreationFee();
 error FeeSendingFailed();
@@ -47,10 +48,12 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     WETH = _WETH;
   }
 
-  function deployBondingERC20Token(string memory _name, string memory _symbol) public payable returns (address) {
-    if (msg.value < creationFee) {
+  function deployBondingERC20TokenAndPurchase(string memory _name, string memory _symbol) public payable returns (address) {
+    uint256 ethRemaining = msg.value;
+    if (ethRemaining < creationFee) {
         revert InvalidCreationFee();
     }
+    ethRemaining -= creationFee;
     ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
       address(this),
       _name,
@@ -66,6 +69,10 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
       WETH
     );
     emit TokenDeployed(address(_bondingERC20Token), msg.sender);
+
+    if (ethRemaining > 0) {
+      IContinuousBondingERC20Token(_bondingERC20Token).buyTokens{value: ethRemaining}(0, msg.sender);
+    }
 
     return address(_bondingERC20Token);
   }

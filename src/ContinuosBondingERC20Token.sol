@@ -84,7 +84,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         WETH = _WETH;
     }
 
-    function buyTokens(uint256 minExpectedAmount) external payable nonReentrant returns (uint256) {
+    function buyTokens(uint256 minExpectedAmount, address recipient) external payable nonReentrant returns (uint256) {
         if (liquidityGoalReached() || isLpCreated) revert LiquidityGoalReached();
         if (msg.value == 0) revert NeedToSendETH();
 
@@ -113,13 +113,13 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         treasuryClaimableEth += feeAmount;
         if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
-        _transfer(address(this), msg.sender, tokensToReceive);
+        _transfer(address(this), recipient, tokensToReceive);
 
         if (liquidityGoalReached()) {
             _createPair();
         }
 
-        (bool sent,) = msg.sender.call{ value: refund }("");
+        (bool sent,) = recipient.call{ value: refund }("");
         if (!sent) {
             revert FailedToSendETH();
         }
@@ -132,7 +132,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
             }
         }
 
-        emit TokensBought(msg.sender, ethReceivedAmount, tokensToReceive, feeAmount);
+        emit TokensBought(recipient, ethReceivedAmount, tokensToReceive, feeAmount);
 
         return tokensToReceive;
     }

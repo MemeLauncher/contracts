@@ -33,7 +33,7 @@ contract ContinuosBondingERC20TokenTest is Test {
   ContinuosBondingERC20Token internal bondingERC20Token;
 
   function setUp() public {
-    uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 19_876_830);
+    uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 53021860);
     vm.selectFork(forkId);
     bondingCurve = new AMMFormula();
     factory = new BondingERC20TokenFactory(
@@ -53,7 +53,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.startPrank(owner);
     vm.stopPrank();
 
-    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20Token("ERC20Token", "ERC20"));
+    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20"));
   }
 
   function testSetUp() public view {
@@ -69,7 +69,7 @@ contract ContinuosBondingERC20TokenTest is Test {
 
     // uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
 
-    bondingERC20Token.buyTokens{ value: amount }(0);
+    bondingERC20Token.buyTokens{ value: amount }(0, user);
 
     uint256 afterBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
     uint256 tokenPerWei = afterBalanceOfBondingToken / amount;
@@ -101,7 +101,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     uint256 feeAmount = amount / 100;
 
     vm.startPrank(user);
-    bondingERC20Token.buyTokens{ value: amount }(0);
+    bondingERC20Token.buyTokens{ value: amount }(0, user);
 
     assertEq(bondingERC20Token.totalEthContributed(), amount - feeAmount);
     assertEq(bondingERC20Token.treasuryClaimableEth() + treasury.balance, feeAmount);
@@ -115,11 +115,11 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.startPrank(user);
 
     // uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
-    bondingERC20Token.buyTokens{ value: halfAmount }(0);
+    bondingERC20Token.buyTokens{ value: halfAmount }(0, user);
     uint256 receivedAfterFirstBuy = bondingERC20Token.balanceOf(user);
     uint256 tokenPerWeiForFirstBuy = (receivedAfterFirstBuy * 1e18) / halfAmount;
 
-    bondingERC20Token.buyTokens{ value: halfAmount }(0);
+    bondingERC20Token.buyTokens{ value: halfAmount }(0, user);
     uint256 receivedAfterSecondBuy = bondingERC20Token.balanceOf(user) - receivedAfterFirstBuy;
     uint256 tokenPerWeiForSecondBuy = (receivedAfterSecondBuy * 1e18) / halfAmount;
     assertGt(receivedAfterFirstBuy, receivedAfterSecondBuy);
@@ -132,8 +132,8 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.deal(user, amount);
     vm.startPrank(user);
 
-    bondingERC20Token.buyTokens{ value: 40 ether }(0);
-    bondingERC20Token.buyTokens{ value: 60 ether }(0);
+    bondingERC20Token.buyTokens{ value: 40 ether }(0, user);
+    bondingERC20Token.buyTokens{ value: 60 ether }(0, user);
     uint256 reserve1 = bondingERC20Token.getReserve();
     uint256 totalEthContributed1 = bondingERC20Token.totalEthContributed();
     uint256 treasuryClaimableEth1 = bondingERC20Token.treasuryClaimableEth();
@@ -144,8 +144,8 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.deal(user, amount);
     vm.startPrank(user);
 
-    bondingERC20Token.buyTokens{ value: 50 ether }(0);
-    bondingERC20Token.buyTokens{ value: 50 ether }(0);
+    bondingERC20Token.buyTokens{ value: 50 ether }(0, user);
+    bondingERC20Token.buyTokens{ value: 50 ether }(0, user);
     uint256 reserve2 = bondingERC20Token.getReserve();
     uint256 totalEthContributed2 = bondingERC20Token.totalEthContributed();
     uint256 treasuryClaimableEth2 = bondingERC20Token.treasuryClaimableEth();
@@ -160,7 +160,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.deal(user, amount);
     vm.startPrank(user);
 
-    bondingERC20Token.buyTokens{ value: amount }(0);
+    bondingERC20Token.buyTokens{ value: amount }(0, user);
 
     uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
 
@@ -183,7 +183,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.deal(user, amount);
     vm.startPrank(user);
 
-    bondingERC20Token.buyTokens{ value: amount }(0);
+    bondingERC20Token.buyTokens{ value: amount }(0, user);
 
     uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
 

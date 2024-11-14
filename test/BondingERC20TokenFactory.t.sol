@@ -25,7 +25,7 @@ contract BondingERC20TokenFactoryTest is Test {
   address internal WETH = makeAddr("WETH");
 
   function setUp() public {
-    uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 19_876_830);
+    uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 53021860);
     vm.selectFork(forkId);
 
     router = 0x60aE616a2155Ee3d9A68541Ba4544862310933d4; // trader-joe router
@@ -46,7 +46,7 @@ contract BondingERC20TokenFactoryTest is Test {
   }
 
   function testDeployBondingERC20TokenSuccess() public {
-    address bondingERC20Token = factory.deployBondingERC20Token("ERC20Token", "ERC20");
+    address bondingERC20Token = factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20");
 
     assertNotEq(bondingERC20Token, address(0));
     assertEq(address(IContinuousBondingERC20Token(bondingERC20Token).bondingCurve()), address(bondingCurve));
@@ -56,13 +56,13 @@ contract BondingERC20TokenFactoryTest is Test {
   }
 
   function testUpdateBondingCurveSuccess() public {
-    address bondingERC20TokenOldBondingCurve = factory.deployBondingERC20Token("ERC20Token", "ERC20");
+    address bondingERC20TokenOldBondingCurve = factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20");
     IBondingCurve newBondingCurve = new AMMFormula();
 
     vm.startPrank(owner);
     factory.updateBondingCurve(newBondingCurve);
 
-    address bondingERC20TokenNewBondingCurve = factory.deployBondingERC20Token("ERC20Token", "ERC20");
+    address bondingERC20TokenNewBondingCurve = factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20");
 
     assertEq(
       address(IContinuousBondingERC20Token(bondingERC20TokenOldBondingCurve).bondingCurve()),
@@ -79,9 +79,9 @@ contract BondingERC20TokenFactoryTest is Test {
     factory.updateCreationFee(0.01 ether);
 
     vm.expectRevert();
-    factory.deployBondingERC20Token{value: 0.001 ether}("ERC20Token", "ERC20");
+    factory.deployBondingERC20TokenAndPurchase{value: 0.001 ether}("ERC20Token", "ERC20");
 
-    factory.deployBondingERC20Token{value: 0.01 ether}("ERC20Token", "ERC20");
+    factory.deployBondingERC20TokenAndPurchase{value: 0.01 ether}("ERC20Token", "ERC20");
 
     uint256 treasuryBalanceBefore = treasury.balance;
 
@@ -102,13 +102,13 @@ contract BondingERC20TokenFactoryTest is Test {
   }
 
   function testUpdateTreasurySuccess() public {
-    address bondingERC20TokenOldTreasury = factory.deployBondingERC20Token("ERC20Token", "ERC20");
+    address bondingERC20TokenOldTreasury = factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20");
     address newTreasury = makeAddr("newTreasury");
 
     vm.startPrank(owner);
     factory.updateTreasury(newTreasury);
 
-    address bondingERC20TokenNewTreasury = factory.deployBondingERC20Token("ERC20Token", "ERC20");
+    address bondingERC20TokenNewTreasury = factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20");
 
     assertEq(IContinuousBondingERC20Token(bondingERC20TokenOldTreasury).TREASURY_ADDRESS(), treasury);
     assertEq(IContinuousBondingERC20Token(bondingERC20TokenNewTreasury).TREASURY_ADDRESS(), newTreasury);
