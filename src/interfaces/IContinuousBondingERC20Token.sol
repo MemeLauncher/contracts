@@ -16,4 +16,7 @@ interface IContinuousBondingERC20Token is IERC20 {
   function totalEthContributed() external returns (uint256);
 
   function isLpCreated() external returns (bool);
+
+  function buyTokens(uint256 minExpectedAmount, address recipient) external payable returns (uint256);
+
 }

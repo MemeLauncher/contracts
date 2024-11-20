@@ -31,7 +31,7 @@ contract Deploy is Script  {
       NON_FUNGIBLE_POSITION_MANAGER,
       WETH
     );
-    address token = tokenFactory.deployBondingERC20Token{value: 0.01 ether}("TestApe", "TestApe");
+    address token = tokenFactory.deployBondingERC20TokenAndPurchase{value: 0.01 ether}("TestApe", "TestApe");
     console.log("factory is deployed at", address(tokenFactory));
     console.log("token is deployed at", token);
   }
