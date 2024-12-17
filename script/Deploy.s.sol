@@ -26,13 +26,17 @@ contract Deploy is Script  {
       800_000_000 ether,
       100,
       100,
-      0.01 ether, //// creation fee
+      0 ether, //// creation fee
       UNISWAP_V3_FACTORY,
       NON_FUNGIBLE_POSITION_MANAGER,
       WETH
     );
     address token = tokenFactory.deployBondingERC20TokenAndPurchase{value: 0.01 ether}("TestApe", "TestApe");
+
     console.log("factory is deployed at", address(tokenFactory));
     console.log("token is deployed at", token);
   }
 }
+
+// DEPLOYMENT INSTRUCTIONS
+// forge script script/Deploy.s.sol:Deploy --broadcast --account MOAR_CANDY_DEV   --rpc-url https://curtis.rpc.caldera.xyz/http  -vvvvv 
