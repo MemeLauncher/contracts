@@ -270,7 +270,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
 
     function _getSqrtPriceX96(uint256 amountOfToken0, uint256 amountOfToken1) internal pure returns (uint160) {
         if (amountOfToken0 == 0) revert DivisionByZero();
-        uint256 price = amountOfToken1 * (2 ** 96) * (2 ** 96) / amountOfToken0;
+        uint256 price = (amountOfToken1 * (2 ** 96) / amountOfToken0) * (2 ** 96);
         uint256 sqrtPrice = _sqrt(price);
         return uint160(sqrtPrice);
     }
