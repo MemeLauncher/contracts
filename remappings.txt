@@ -1,3 +1,4 @@
 @openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
 forge-std/=node_modules/forge-std/
 @uniswap/=node_modules/@uniswap/
+@erc404/=node_modules/ERC404/

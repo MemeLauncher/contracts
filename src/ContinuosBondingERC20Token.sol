@@ -12,6 +12,7 @@ import { TickMath } from "./libraries/TickMath.sol";
 import { IContinuousBondingERC20Token } from "./interfaces/IContinuousBondingERC20Token.sol";
 import { IBondingERC20TokenFactory } from "./interfaces/IBondingERC20TokenFactory.sol";
 import { FixedPoint96 } from "./libraries/FixedPoint96.sol";
+import {ERC404} from "@erc404/contracts/ERC404.sol";
 
 event TokensBought(address indexed buyer, uint256 ethAmount, uint256 tokenBought, uint256 feeEarnedByTreasury);
 
@@ -33,7 +34,7 @@ error InSufficientAmountReceived();
 error DivisionByZero();
 error TransferToUniswapV3PoolsAreNotAllowed();
 
-contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, ReentrancyGuard {
+contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC404, ReentrancyGuard {
     uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
@@ -68,14 +69,14 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         address _nonfungiblePositionManager,
         address _WETH
     )
-        ERC20(_name, _symbol)
+        ERC404(_name, _symbol, 18)
     {
         factory = _factory;
         TREASURY_ADDRESS = _treasury;
         buyFee = _buyFee;
         sellFee = _sellFee;
         bondingCurve = _bondingCurve;
-        _mint(address(this), MAX_TOTAL_SUPPLY);
+        _transferERC20(address(0), address(this), MAX_TOTAL_SUPPLY);
         initialTokenBalance = _initialTokenBalance;
         ethBalance = _initialTokenBalance;
         availableTokenBalance = _availableTokenBalance;
@@ -113,7 +114,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         treasuryClaimableEth += feeAmount;
         if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
-        _transfer(address(this), recipient, tokensToReceive);
+        _transferERC20(address(this), recipient, tokensToReceive);
 
         if (liquidityGoalReached()) {
             _createPair();
@@ -153,7 +154,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         if (reimburseAmount < minExpectedEth) revert InSufficientAmountReceived();
         if (address(this).balance < reimburseAmount + treasuryClaimableEth) revert ContractNotEnoughETH();
 
-        _transfer(msg.sender, address(this), tokenAmount);
+        _transferERC20(msg.sender, address(this), tokenAmount);
         (bool sent,) = msg.sender.call{ value: reimburseAmount }("");
         if (!sent) revert FailedToSendETH();
 
@@ -169,7 +170,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     }
 
     function getReserve() public view returns (uint256) {
-        return balanceOf(address(this));
+        return erc20BalanceOf(address(this));
     }
 
     function liquidityGoalReached() public view returns (bool) {
@@ -219,7 +220,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
         // Approve the position manager to spend tokens
-        _approve(address(this), address(nonfungiblePositionManager), currentTokenBalance);
+        // erc20Approve(address(this), address(nonfungiblePositionManager), currentTokenBalance);
+        allowance[address(this)][address(nonfungiblePositionManager)] = currentTokenBalance;
         IWETH(WETH).deposit{ value: currentEth }();
         IWETH(WETH).approve(address(nonfungiblePositionManager), currentEth);
 
@@ -253,7 +255,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         emit PairCreated(amount1, amount0, liquidity, pool);
     }
 
-    function _update(address from, address to, uint256 value) internal virtual override {
+    function _transferERC20(address from, address to, uint256 value) internal virtual override {
         if (
             !liquidityGoalReached() && from != address(0) && to != address(0) && from != address(this)
                 && to != address(this) && !isLpCreated
@@ -265,7 +267,12 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
                 revert TransferToUniswapV3PoolsAreNotAllowed();
             }
         }
-        super._update(from, to, value);
+        super._transferERC20(from, to, value);
+    }
+
+    // todo: to implement after getting clarity from product team
+    function tokenURI(uint256 id_) public view override returns (string memory) {
+        return "";
     }
 
     function _getSqrtPriceX96(uint256 amountOfToken0, uint256 amountOfToken1) internal pure returns (uint160) {
