@@ -32,11 +32,14 @@ error LiquidityGoalReached();
 error InSufficientAmountReceived();
 error DivisionByZero();
 error TransferToUniswapV3PoolsAreNotAllowed();
+error AntiWhaleFeatureEnabled();
 
 contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, ReentrancyGuard {
     uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
+    uint256 public constant ANTI_WHALE_TIME_PERIOD = 1 days;
+    uint256 public immutable ANTI_WHALE_MAX_TOKEN;
 
     IBondingCurve public immutable bondingCurve;
     address public immutable TREASURY_ADDRESS;
@@ -49,6 +52,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     uint256 public sellFee;
     uint256 public treasuryClaimableEth;
     bool public isLpCreated;
+    bool public isAntiWhaleFlagEnabled;
+    uint256 public creationTime;
 
     IUniswapV3Factory public immutable uniswapV3Factory;
     INonfungiblePositionManager public immutable nonfungiblePositionManager;
@@ -66,7 +71,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         uint256 _availableTokenBalance,
         address _uniswapV3Factory,
         address _nonfungiblePositionManager,
-        address _WETH
+        address _WETH,
+        bool _isAntiWhaleFlagEnabled
     )
         ERC20(_name, _symbol)
     {
@@ -82,6 +88,9 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         uniswapV3Factory = IUniswapV3Factory(_uniswapV3Factory);
         nonfungiblePositionManager = INonfungiblePositionManager(_nonfungiblePositionManager);
         WETH = _WETH;
+        isAntiWhaleFlagEnabled = _isAntiWhaleFlagEnabled;
+        creationTime = block.timestamp;
+        ANTI_WHALE_MAX_TOKEN = 3 * MAX_TOTAL_SUPPLY / 100;
     }
 
     function buyTokens(uint256 minExpectedAmount, address recipient) external payable nonReentrant returns (uint256) {
@@ -114,6 +123,9 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
         _transfer(address(this), recipient, tokensToReceive);
+        if (isAntiWhaleFlagEnabled && block.timestamp - creationTime < ANTI_WHALE_TIME_PERIOD && balanceOf(recipient) > ANTI_WHALE_MAX_TOKEN) {
+            revert AntiWhaleFeatureEnabled();
+        }
 
         if (liquidityGoalReached()) {
             _createPair();

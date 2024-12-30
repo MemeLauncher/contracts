@@ -53,13 +53,31 @@ contract ContinuosBondingERC20TokenTest is Test {
     vm.startPrank(owner);
     vm.stopPrank();
 
-    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20"));
+    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", false));
   }
 
   function testSetUp() public view {
     assertEq(bondingERC20Token.initialTokenBalance(), initialTokenBalance);
     assertEq(bondingERC20Token.availableTokenBalance(), availableTokenBalance);
     assertEq(bondingERC20Token.treasuryClaimableEth(), 0);
+  }
+
+  function testAntiWhaleFeature() public {
+    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", true));
+    assertEq(bondingERC20Token.isAntiWhaleFlagEnabled(), true);
+
+    uint256 amount = 100 ether;
+    vm.deal(user, amount);
+    vm.startPrank(user);
+
+    vm.expectRevert();
+    bondingERC20Token.buyTokens{ value: amount }(0, user);
+
+    // buys around 2.9% of the total supply
+    bondingERC20Token.buyTokens{ value: 1.5 ether }(0, user);
+
+    uint256 afterBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
+    uint256 tokenPerWei = afterBalanceOfBondingToken / amount;
   }
 
   function testCanBuyToken() public {
