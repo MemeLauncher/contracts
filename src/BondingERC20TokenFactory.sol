@@ -48,7 +48,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     WETH = _WETH;
   }
 
-  function deployBondingERC20TokenAndPurchase(string memory _name, string memory _symbol) public payable returns (address) {
+  function deployBondingERC20TokenAndPurchase(string memory _name, string memory _symbol, bool _isAntiWhaleFlagEnabled) public payable returns (address) {
     uint256 ethRemaining = msg.value;
     if (ethRemaining < creationFee) {
         revert InvalidCreationFee();
@@ -66,7 +66,8 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
       availableTokenBalance,
       uniswapV3Factory,
       nonfungiblePositionManager,
-      WETH
+      WETH,
+      _isAntiWhaleFlagEnabled
     );
     emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 

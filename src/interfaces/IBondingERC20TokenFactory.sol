@@ -43,7 +43,7 @@ interface IBondingERC20TokenFactory {
   function sellFee() external view returns (uint256);
 
   // Public functions
-  function deployBondingERC20TokenAndPurchase(string memory _name, string memory _symbol) external payable returns (address);
+  function deployBondingERC20TokenAndPurchase(string memory _name, string memory _symbol, bool _isAntiWhaleFlagEnabled) external payable returns (address);
 
   function updateBuyFee(uint256 _newBuyFee) external;
 

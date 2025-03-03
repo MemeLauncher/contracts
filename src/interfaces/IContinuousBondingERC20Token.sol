@@ -17,6 +17,8 @@ interface IContinuousBondingERC20Token is IERC20 {
 
   function isLpCreated() external returns (bool);
 
+  function isAntiWhaleFlagEnabled() external view returns (bool);
+
   function buyTokens(uint256 minExpectedAmount, address recipient) external payable returns (uint256);
 
 }
