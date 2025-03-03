@@ -38,8 +38,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
-    uint256 public constant ANTI_WHALE_TIME_PERIOD = 1 days;
-    uint256 public immutable ANTI_WHALE_MAX_TOKEN;
+
+    AntiWhale private _antiWhale;
 
     IBondingCurve public immutable bondingCurve;
     address public immutable TREASURY_ADDRESS;
@@ -52,7 +52,6 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     uint256 public sellFee;
     uint256 public treasuryClaimableEth;
     bool public isLpCreated;
-    bool public isAntiWhaleFlagEnabled;
     uint256 public creationTime;
 
     IUniswapV3Factory public immutable uniswapV3Factory;
@@ -72,7 +71,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         address _uniswapV3Factory,
         address _nonfungiblePositionManager,
         address _WETH,
-        bool _isAntiWhaleFlagEnabled
+        AntiWhale memory _antiWhaleProps
     )
         ERC20(_name, _symbol)
     {
@@ -88,9 +87,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         uniswapV3Factory = IUniswapV3Factory(_uniswapV3Factory);
         nonfungiblePositionManager = INonfungiblePositionManager(_nonfungiblePositionManager);
         WETH = _WETH;
-        isAntiWhaleFlagEnabled = _isAntiWhaleFlagEnabled;
         creationTime = block.timestamp;
-        ANTI_WHALE_MAX_TOKEN = 3 * MAX_TOTAL_SUPPLY / 100;
+        _antiWhale = _antiWhaleProps;
     }
 
     function buyTokens(uint256 minExpectedAmount, address recipient) external payable nonReentrant returns (uint256) {
@@ -123,7 +121,10 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
         _transfer(address(this), recipient, tokensToReceive);
-        if (isAntiWhaleFlagEnabled && block.timestamp - creationTime < ANTI_WHALE_TIME_PERIOD && balanceOf(recipient) > ANTI_WHALE_MAX_TOKEN) {
+        if (
+            balanceOf(recipient) > ((_antiWhale.pctSupply * MAX_TOTAL_SUPPLY) / 100) && _antiWhale.isEnabled
+                && (_antiWhale.timePeriod == 0 || block.timestamp - creationTime < _antiWhale.timePeriod)
+        ) {
             revert AntiWhaleFeatureEnabled();
         }
 
@@ -203,6 +204,14 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         return bondingCurve.calculateSaleReturn(tokenAmount, tokenReserveBalance, ethBalance, bytes(""));
     }
 
+    function antiWhale() public view returns (AntiWhale memory) {
+        return _antiWhale;
+    }
+
+    function isAntiWhaleFlagEnabled() public view returns (bool) {
+        return _antiWhale.isEnabled;
+    }
+
     function claimTreasuryBalance(address to, uint256 amount) public {
         if (msg.sender != TREASURY_ADDRESS) {
             revert InvalidSender();
@@ -237,11 +246,11 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
 
         address feeRecipient = IBondingERC20TokenFactory(factory).feeRecipient();
 
-        int24 tickLower = -887272;
+        int24 tickLower = -887_272;
         int24 tickUpper = -tickLower;
 
-        tickLower=-(-tickLower/tickSpacing*tickSpacing);
-        tickUpper=tickUpper/tickSpacing*tickSpacing;
+        tickLower = -(-tickLower / tickSpacing * tickSpacing);
+        tickUpper = tickUpper / tickSpacing * tickSpacing;
 
         // Add liquidity
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
@@ -254,9 +263,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
             amount1Desired: amountOfToken1,
             amount0Min: 0,
             amount1Min: 0,
-            recipient: feeRecipient != address(0)
-                ? feeRecipient
-                : address(this),
+            recipient: feeRecipient != address(0) ? feeRecipient : address(this),
             deadline: block.timestamp
         });
 

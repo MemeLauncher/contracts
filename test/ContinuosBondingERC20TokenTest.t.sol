@@ -31,6 +31,8 @@ contract ContinuosBondingERC20TokenTest is Test {
   BondingERC20TokenFactory internal factory;
   IBondingCurve internal bondingCurve;
   ContinuosBondingERC20Token internal bondingERC20Token;
+  IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
+    IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
 
   function setUp() public {
     uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 53021860);
@@ -47,13 +49,16 @@ contract ContinuosBondingERC20TokenTest is Test {
       creationFee,
       uniswapV3Factory,
       nonfungiblePositionManager,
-      WETH
+      WETH,
+      _antiWhale
     );
 
     vm.startPrank(owner);
     vm.stopPrank();
 
-    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", false));
+    bondingERC20Token = ContinuosBondingERC20Token(
+      factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", false)
+    );
   }
 
   function testSetUp() public view {
@@ -63,7 +68,9 @@ contract ContinuosBondingERC20TokenTest is Test {
   }
 
   function testAntiWhaleFeature() public {
-    bondingERC20Token = ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", true));
+    bondingERC20Token = ContinuosBondingERC20Token(
+      factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", true)
+    );
     assertEq(bondingERC20Token.isAntiWhaleFlagEnabled(), true);
 
     uint256 amount = 100 ether;

@@ -23,6 +23,8 @@ contract BondingERC20TokenFactoryTest is Test {
   address internal uniswapV3Factory = makeAddr("uniswapV3Factory");
   address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
   address internal WETH = makeAddr("WETH");
+  IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
+    IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
 
   function setUp() public {
     uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 53021860);
@@ -41,7 +43,8 @@ contract BondingERC20TokenFactoryTest is Test {
       creationFee,
       uniswapV3Factory,
       nonfungiblePositionManager,
-      WETH
+      WETH,
+      _antiWhale
     );
   }
 
@@ -80,9 +83,9 @@ contract BondingERC20TokenFactoryTest is Test {
     factory.updateCreationFee(0.01 ether);
 
     vm.expectRevert();
-    factory.deployBondingERC20TokenAndPurchase{value: 0.001 ether}("ERC20Token", "ERC20", false);
+    factory.deployBondingERC20TokenAndPurchase{ value: 0.001 ether }("ERC20Token", "ERC20", false);
 
-    factory.deployBondingERC20TokenAndPurchase{value: 0.01 ether}("ERC20Token", "ERC20", false);
+    factory.deployBondingERC20TokenAndPurchase{ value: 0.01 ether }("ERC20Token", "ERC20", false);
 
     uint256 treasuryBalanceBefore = treasury.balance;
 

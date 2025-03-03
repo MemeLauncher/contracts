@@ -6,6 +6,7 @@ import { IBondingCurve } from "./IBondingCurve.sol";
 interface IBondingERC20TokenFactory {
   // Events
   event BondingCurveUpdated(address indexed newBondingCurve, address indexed oldBondingCurve);
+  event AntiWhaleUpdated(bool indexed isEnabled, uint256 indexed timePeriod, uint256 indexed newPctSupply);
   event TreasuryUpdated(address indexed newTreasury, address indexed oldTreasury);
   event AvailableTokenUpdated(uint256 indexed newAvailableToken, uint256 indexed oldAvailableToken);
   event InitialTokenBalanceUpdated(uint256 indexed newInitialTokenBalance, uint256 indexed oldInitialTokenBalance);
@@ -43,7 +44,11 @@ interface IBondingERC20TokenFactory {
   function sellFee() external view returns (uint256);
 
   // Public functions
-  function deployBondingERC20TokenAndPurchase(string memory _name, string memory _symbol, bool _isAntiWhaleFlagEnabled) external payable returns (address);
+  function deployBondingERC20TokenAndPurchase(
+    string memory _name,
+    string memory _symbol,
+    bool _isAntiWhaleFlagEnabled
+  ) external payable returns (address);
 
   function updateBuyFee(uint256 _newBuyFee) external;
 
