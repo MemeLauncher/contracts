@@ -25,7 +25,7 @@ contract BondingERC20TokenFactoryTest is Test {
     address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
     address internal WETH = makeAddr("WETH");
     IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
+        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 0, pctSupply: 300 });
 
     function setUp() public {
         uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 58_153_914);
@@ -47,7 +47,8 @@ contract BondingERC20TokenFactoryTest is Test {
             nonfungiblePositionManager,
             uniswapV3Locker,
             WETH,
-            _antiWhale
+            _antiWhale,
+            3000
         );
     }
 

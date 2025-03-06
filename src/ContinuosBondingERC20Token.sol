@@ -125,8 +125,9 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
 
         _transfer(address(this), recipient, tokensToReceive);
         if (
-            balanceOf(recipient) > ((antiWhale.pctSupply * MAX_TOTAL_SUPPLY) / 100) && antiWhale.isEnabled
-                && (antiWhale.timePeriod == 0 || block.timestamp - creationTime < antiWhale.timePeriod)
+            balanceOf(recipient) > ((antiWhale.pctSupply * MAX_TOTAL_SUPPLY) / PERCENTAGE_DENOMINATOR)
+                && antiWhale.isEnabled
+                && (antiWhale.timePeriod == 0 || (block.timestamp - creationTime) < antiWhale.timePeriod)
         ) {
             revert AntiWhaleFeatureEnabled();
         }

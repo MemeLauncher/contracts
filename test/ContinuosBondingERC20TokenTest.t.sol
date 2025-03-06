@@ -35,7 +35,7 @@ contract ContinuosBondingERC20TokenTest is Test {
     IBondingCurve internal bondingCurve;
     ContinuosBondingERC20Token internal bondingERC20Token;
     IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
+        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 0, pctSupply: 300 });
 
     function setUp() public {
         uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 58_153_914);
@@ -54,7 +54,8 @@ contract ContinuosBondingERC20TokenTest is Test {
             nonfungiblePositionManager,
             uniswapV3Locker,
             WETH,
-            _antiWhale
+            _antiWhale,
+            3000
         );
 
         vm.startPrank(owner);
@@ -70,20 +71,82 @@ contract ContinuosBondingERC20TokenTest is Test {
         assertEq(bondingERC20Token.treasuryClaimableEth(), 0);
     }
 
+    function testAntiWhaleFeatureBasedOnMaxSupply() public {
+        uint256 userInitialBalance = 100 ether; // Provide sufficient funds
+        vm.deal(user, userInitialBalance); // Give user enough ETH to buy tokens
+
+        BondingERC20TokenFactory tokenFactory = new BondingERC20TokenFactory(
+            0x4dAb467dB2480422566cD57eae9624c6c273220E,
+            bondingCurve,
+            0x4dAb467dB2480422566cD57eae9624c6c273220E,
+            25 ether,
+            800_000_000 ether,
+            100,
+            100,
+            0 ether, //// creation fee
+            uniswapV3Factory,
+            nonfungiblePositionManager,
+            uniswapV3Locker,
+            WETH,
+            _antiWhale,
+            3000
+        );
+        ContinuosBondingERC20Token token =
+            ContinuosBondingERC20Token(tokenFactory.deployBondingERC20TokenAndPurchase("TestApe", "TestApe", true));
+
+        assertEq(token.isAntiWhaleFlagEnabled(), true);
+
+        uint256 maxSupply = token.MAX_TOTAL_SUPPLY();
+        uint256 threePercenteSupply = (maxSupply * 3) / 100;
+
+        console2.log("Max Total Supply:", maxSupply);
+        console2.log("3% of MAX_TOTAL_SUPPLY:", threePercenteSupply);
+
+        uint256 ethNeeded = token.calculateETHAmount(threePercenteSupply);
+        console2.log("ETH needed to buy 3%:", ethNeeded);
+
+        uint256 balanceBefore = token.balanceOf(user);
+        console2.log("User balance before purchase:", balanceBefore);
+
+        vm.startPrank(user);
+
+        uint256 smallerAmount = (maxSupply * 290) / 10_000;
+        uint256 ethNeededForSmallerAmount = token.calculateETHAmount(smallerAmount);
+
+        console2.log("ETH needed for 2.9%:", ethNeededForSmallerAmount);
+        token.buyTokens{ value: ethNeededForSmallerAmount }(0, user);
+
+        vm.expectRevert(abi.encodeWithSignature("AntiWhaleFeatureEnabled()"));
+        token.buyTokens{ value: 1 ether }(0, user);
+
+        uint256 balanceAfter = token.balanceOf(user);
+        console2.log("User balance after purchase:", balanceAfter);
+
+        assertGt(balanceAfter, balanceBefore, "Balance should increase after buying within the limit");
+
+        vm.stopPrank();
+    }
+
     function testAntiWhaleFeature() public {
         bondingERC20Token =
             ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", true));
+
         assertEq(bondingERC20Token.isAntiWhaleFlagEnabled(), true);
 
         uint256 amount = 100 ether;
         vm.deal(user, amount);
         vm.startPrank(user);
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSignature("AntiWhaleFeatureEnabled()"));
         bondingERC20Token.buyTokens{ value: amount }(0, user);
-
-        // buys around 2.9% of the total supply
+        uint256 initialBalance = bondingERC20Token.balanceOf(user);
         bondingERC20Token.buyTokens{ value: 1.5 ether }(0, user);
+
+        // Ensure the balance increased
+        uint256 newBalance = bondingERC20Token.balanceOf(user);
+        assertGt(newBalance, initialBalance, "Balance should increase after buying tokens");
+
+        vm.stopPrank();
     }
 
     function testCanBuyToken() public {

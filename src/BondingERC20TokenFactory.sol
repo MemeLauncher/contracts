@@ -16,6 +16,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     address public treasury;
     address public uniswapV3Factory;
     address public uniswapV3Locker;
+    uint24 public uniswapV3FeeTier;
     address public nonfungiblePositionManager;
     address public feeRecipient;
     uint256 public initialTokenBalance;
@@ -38,7 +39,8 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
         address _nonfungiblePositionManager,
         address _uniswapV3Locker,
         address _WETH,
-        IContinuousBondingERC20Token.AntiWhale memory _antiWhale
+        IContinuousBondingERC20Token.AntiWhale memory _antiWhale,
+        uint24 _uniswapV3FeeTier
     )
         Ownable(_owner)
     {
@@ -54,6 +56,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
         WETH = _WETH;
         antiWhale = _antiWhale;
         uniswapV3Locker = _uniswapV3Locker;
+        uniswapV3FeeTier = _uniswapV3FeeTier;
     }
 
     function deployBondingERC20TokenAndPurchase(
@@ -89,7 +92,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
             nonfungiblePositionManager,
             WETH,
             _antiWhale,
-            3000
+            uniswapV3FeeTier
         );
         emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
