@@ -5,6 +5,7 @@ import { Test } from "forge-std/src/Test.sol";
 import { console2 } from "forge-std/src/console2.sol";
 import { stdMath } from "forge-std/src/StdMath.sol";
 
+import { IUniswapV3Locker } from "src/interfaces/IUniswapV3Locker.sol";
 import { BondingERC20TokenFactory } from "src/BondingERC20TokenFactory.sol";
 import { ContinuosBondingERC20Token } from "src/ContinuosBondingERC20Token.sol";
 import { IContinuousBondingERC20Token } from "src/interfaces/IContinuousBondingERC20Token.sol";
@@ -12,213 +13,217 @@ import { IBondingCurve } from "src/interfaces/IBondingCurve.sol";
 import { AMMFormula } from "src/utils/AMMFormula.sol";
 
 contract ContinuosBondingERC20TokenTest is Test {
-  address internal treasury = makeAddr("treasury");
-  address internal owner = makeAddr("owner");
-  address internal user = makeAddr("user");
-  uint256 internal availableTokenBalance = 800_000_000 ether;
-  uint256 internal initialTokenBalance = 50 ether; // liquidity goal will be reached at (50*4) avax. formula can be
-  // generalised
-  uint256 internal expectedLiquidityGoal = 200 ether;
-  uint256 internal MAX_TOTAL_SUPPLY = 1_000_000_000 ether;
-  uint256 internal buyFee = 100;
-  uint256 internal sellFee = 100;
-  uint256 internal creationFee = 0;
+    address internal treasury = makeAddr("treasury");
+    address internal owner = makeAddr("owner");
+    address internal user = makeAddr("user");
+    uint256 internal availableTokenBalance = 800_000_000 ether;
+    uint256 internal initialTokenBalance = 50 ether; // liquidity goal will be reached at (50*4) avax. formula can be
+    // generalised
+    uint256 internal expectedLiquidityGoal = 200 ether;
+    uint256 internal MAX_TOTAL_SUPPLY = 1_000_000_000 ether;
+    uint256 internal buyFee = 100;
+    uint256 internal sellFee = 100;
+    uint256 internal creationFee = 0;
 
-  address internal uniswapV3Factory = makeAddr("uniswapV3Factory");
-  address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
-  address internal WETH = makeAddr("WETH");
+    address internal uniswapV3Locker = 0xaacBE7601F589464cd27B09Ba87478fA1396Ed3C;
+    address internal uniswapV3Factory = 0x62B672E531f8c11391019F6fba0b8B6143504169;
+    address internal nonfungiblePositionManager = 0xC967b23826DdAB00d9AAd3702CbF5261B7Ed9a3a;
 
-  BondingERC20TokenFactory internal factory;
-  IBondingCurve internal bondingCurve;
-  ContinuosBondingERC20Token internal bondingERC20Token;
-  IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-    IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
+    address internal WETH = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7;
 
-  function setUp() public {
-    uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 53021860);
-    vm.selectFork(forkId);
-    bondingCurve = new AMMFormula();
-    factory = new BondingERC20TokenFactory(
-      owner,
-      bondingCurve,
-      treasury,
-      initialTokenBalance,
-      availableTokenBalance,
-      buyFee,
-      sellFee,
-      creationFee,
-      uniswapV3Factory,
-      nonfungiblePositionManager,
-      WETH,
-      _antiWhale
-    );
+    BondingERC20TokenFactory internal factory;
+    IBondingCurve internal bondingCurve;
+    ContinuosBondingERC20Token internal bondingERC20Token;
+    IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
+        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
 
-    vm.startPrank(owner);
-    vm.stopPrank();
+    function setUp() public {
+        uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 58_153_914);
+        vm.selectFork(forkId);
+        bondingCurve = new AMMFormula();
+        factory = new BondingERC20TokenFactory(
+            owner,
+            bondingCurve,
+            treasury,
+            initialTokenBalance,
+            availableTokenBalance,
+            buyFee,
+            sellFee,
+            creationFee,
+            uniswapV3Factory,
+            nonfungiblePositionManager,
+            uniswapV3Locker,
+            WETH,
+            _antiWhale
+        );
 
-    bondingERC20Token = ContinuosBondingERC20Token(
-      factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", false)
-    );
-  }
+        vm.startPrank(owner);
+        vm.stopPrank();
 
-  function testSetUp() public view {
-    assertEq(bondingERC20Token.initialTokenBalance(), initialTokenBalance);
-    assertEq(bondingERC20Token.availableTokenBalance(), availableTokenBalance);
-    assertEq(bondingERC20Token.treasuryClaimableEth(), 0);
-  }
+        bondingERC20Token =
+            ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", false));
+    }
 
-  function testAntiWhaleFeature() public {
-    bondingERC20Token = ContinuosBondingERC20Token(
-      factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", true)
-    );
-    assertEq(bondingERC20Token.isAntiWhaleFlagEnabled(), true);
+    function testSetUp() public view {
+        assertEq(bondingERC20Token.initialTokenBalance(), initialTokenBalance);
+        assertEq(bondingERC20Token.availableTokenBalance(), availableTokenBalance);
+        assertEq(bondingERC20Token.treasuryClaimableEth(), 0);
+    }
 
-    uint256 amount = 100 ether;
-    vm.deal(user, amount);
-    vm.startPrank(user);
+    function testAntiWhaleFeature() public {
+        bondingERC20Token =
+            ContinuosBondingERC20Token(factory.deployBondingERC20TokenAndPurchase("ERC20Token", "ERC20", true));
+        assertEq(bondingERC20Token.isAntiWhaleFlagEnabled(), true);
 
-    vm.expectRevert();
-    bondingERC20Token.buyTokens{ value: amount }(0, user);
+        uint256 amount = 100 ether;
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    // buys around 2.9% of the total supply
-    bondingERC20Token.buyTokens{ value: 1.5 ether }(0, user);
+        vm.expectRevert();
+        bondingERC20Token.buyTokens{ value: amount }(0, user);
 
-    uint256 afterBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
-    uint256 tokenPerWei = afterBalanceOfBondingToken / amount;
-  }
+        // buys around 2.9% of the total supply
+        bondingERC20Token.buyTokens{ value: 1.5 ether }(0, user);
+    }
 
-  function testCanBuyToken() public {
-    uint256 amount = 100 ether;
-    vm.deal(user, amount);
-    vm.startPrank(user);
+    function testCanBuyToken() public {
+        uint256 amount = 100 ether;
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    // uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
+        // uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
 
-    bondingERC20Token.buyTokens{ value: amount }(0, user);
+        bondingERC20Token.buyTokens{ value: amount }(0, user);
 
-    uint256 afterBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
-    uint256 tokenPerWei = afterBalanceOfBondingToken / amount;
+        uint256 afterBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
+        uint256 tokenPerWei = afterBalanceOfBondingToken / amount;
 
-    assertGt(afterBalanceOfBondingToken, 0);
-    assertGt(tokenPerWei, 0);
-    assertEq(bondingERC20Token.totalEthContributed(), 99 ether); // 1% goes to treasury
-    assertEq(bondingERC20Token.treasuryClaimableEth() + treasury.balance, 1 ether); // 1% treasury funds
-  }
+        assertGt(afterBalanceOfBondingToken, 0);
+        assertGt(tokenPerWei, 0);
+        assertEq(bondingERC20Token.totalEthContributed(), 99 ether); // 1% goes to treasury
+        assertEq(bondingERC20Token.treasuryClaimableEth() + treasury.balance, 1 ether); // 1% treasury funds
+    }
 
-  // TODO: update test to use fork testing and sepolia uniswap v3 contracts
-  // function testCanBuyTokenTillLiquidityGoal() public {
-  //   vm.deal(user, 10_000 ether);
-  //   vm.startPrank(user);
+    function testCanBuyTokenTillLiquidityGoal() public {
+        vm.deal(user, 10_000 ether);
+        vm.startPrank(user);
 
-  //   bondingERC20Token.buyTokens{ value: 202.2 ether }(0);
+        bondingERC20Token.buyTokens{ value: 202.2 ether }(0, user);
 
-  //   vm.expectRevert();
-  //   bondingERC20Token.buyTokens{ value: 1 wei }(0);
+        vm.expectRevert();
+        bondingERC20Token.buyTokens{ value: 1 wei }(0, user);
 
-  //   // pair is created
-  //   assertEq(bondingERC20Token.isLpCreated(), true);
-  //   assertEq(bondingERC20Token.getReserve(), 0);
-  // }
+        // pair is created
+        assertEq(bondingERC20Token.isLpCreated(), true);
+        assertLt(bondingERC20Token.getReserve(), 1000);
+        (, uint256 tokenId,) = bondingERC20Token.liquidityPosition();
+        IUniswapV3Locker.LiquidityPosition memory position = (IUniswapV3Locker(uniswapV3Locker).positions(tokenId));
 
-  function testCanBuyTokenFuzz(uint256 amount) public {
-    amount = bound(amount, 101, expectedLiquidityGoal);
-    vm.deal(user, amount);
-    uint256 feeAmount = amount / 100;
+        assertEq(position.isLocked, true);
+        assertEq(position.owner, address(bondingERC20Token));
+    }
 
-    vm.startPrank(user);
-    bondingERC20Token.buyTokens{ value: amount }(0, user);
+    function testCanBuyTokenFuzz(uint256 amount) public {
+        amount = bound(amount, 101, expectedLiquidityGoal);
+        vm.deal(user, amount);
+        uint256 feeAmount = amount / 100;
 
-    assertEq(bondingERC20Token.totalEthContributed(), amount - feeAmount);
-    assertEq(bondingERC20Token.treasuryClaimableEth() + treasury.balance, feeAmount);
-  }
+        vm.startPrank(user);
+        bondingERC20Token.buyTokens{ value: amount }(0, user);
 
-  function testPriceIncreasesAfterEachBuy() public {
-    uint256 amount = 100 ether;
-    uint256 halfAmount = amount / 2;
+        assertEq(bondingERC20Token.totalEthContributed(), amount - feeAmount);
+        assertEq(bondingERC20Token.treasuryClaimableEth() + treasury.balance, feeAmount);
+    }
 
-    vm.deal(user, amount);
-    vm.startPrank(user);
+    function testPriceIncreasesAfterEachBuy() public {
+        uint256 amount = 100 ether;
+        uint256 halfAmount = amount / 2;
 
-    // uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
-    bondingERC20Token.buyTokens{ value: halfAmount }(0, user);
-    uint256 receivedAfterFirstBuy = bondingERC20Token.balanceOf(user);
-    uint256 tokenPerWeiForFirstBuy = (receivedAfterFirstBuy * 1e18) / halfAmount;
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    bondingERC20Token.buyTokens{ value: halfAmount }(0, user);
-    uint256 receivedAfterSecondBuy = bondingERC20Token.balanceOf(user) - receivedAfterFirstBuy;
-    uint256 tokenPerWeiForSecondBuy = (receivedAfterSecondBuy * 1e18) / halfAmount;
-    assertGt(receivedAfterFirstBuy, receivedAfterSecondBuy);
-    assertGt(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
-  }
+        // uint256 beforeBalanceOfBondingToken = bondingERC20Token.balanceOf(user);
+        bondingERC20Token.buyTokens{ value: halfAmount }(0, user);
+        uint256 receivedAfterFirstBuy = bondingERC20Token.balanceOf(user);
+        uint256 tokenPerWeiForFirstBuy = (receivedAfterFirstBuy * 1e18) / halfAmount;
 
-  function testNearlyEqualTokenMintedForEqualInputAmount() public {
-    uint256 amount = 1000 ether;
+        bondingERC20Token.buyTokens{ value: halfAmount }(0, user);
+        uint256 receivedAfterSecondBuy = bondingERC20Token.balanceOf(user) - receivedAfterFirstBuy;
+        uint256 tokenPerWeiForSecondBuy = (receivedAfterSecondBuy * 1e18) / halfAmount;
+        assertGt(receivedAfterFirstBuy, receivedAfterSecondBuy);
+        assertGt(tokenPerWeiForFirstBuy, tokenPerWeiForSecondBuy);
+    }
 
-    vm.deal(user, amount);
-    vm.startPrank(user);
+    function testNearlyEqualTokenMintedForEqualInputAmount() public {
+        uint256 amount = 1000 ether;
 
-    bondingERC20Token.buyTokens{ value: 40 ether }(0, user);
-    bondingERC20Token.buyTokens{ value: 60 ether }(0, user);
-    uint256 reserve1 = bondingERC20Token.getReserve();
-    uint256 totalEthContributed1 = bondingERC20Token.totalEthContributed();
-    uint256 treasuryClaimableEth1 = bondingERC20Token.treasuryClaimableEth();
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    // resetting the state to initial
-    setUp();
+        bondingERC20Token.buyTokens{ value: 40 ether }(0, user);
+        bondingERC20Token.buyTokens{ value: 60 ether }(0, user);
+        uint256 reserve1 = bondingERC20Token.getReserve();
+        uint256 totalEthContributed1 = bondingERC20Token.totalEthContributed();
+        uint256 treasuryClaimableEth1 = bondingERC20Token.treasuryClaimableEth();
 
-    vm.deal(user, amount);
-    vm.startPrank(user);
+        // resetting the state to initial
+        setUp();
 
-    bondingERC20Token.buyTokens{ value: 50 ether }(0, user);
-    bondingERC20Token.buyTokens{ value: 50 ether }(0, user);
-    uint256 reserve2 = bondingERC20Token.getReserve();
-    uint256 totalEthContributed2 = bondingERC20Token.totalEthContributed();
-    uint256 treasuryClaimableEth2 = bondingERC20Token.treasuryClaimableEth();
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    assertEq(reserve1, reserve2);
-    assertEq(totalEthContributed1, totalEthContributed2);
-    assertEq(treasuryClaimableEth1, treasuryClaimableEth2);
-  }
+        bondingERC20Token.buyTokens{ value: 50 ether }(0, user);
+        bondingERC20Token.buyTokens{ value: 50 ether }(0, user);
+        uint256 reserve2 = bondingERC20Token.getReserve();
+        uint256 totalEthContributed2 = bondingERC20Token.totalEthContributed();
+        uint256 treasuryClaimableEth2 = bondingERC20Token.treasuryClaimableEth();
 
-  function testCanSellToken() public {
-    uint256 amount = 100 ether;
-    vm.deal(user, amount);
-    vm.startPrank(user);
+        assertEq(reserve1, reserve2);
+        assertEq(totalEthContributed1, totalEthContributed2);
+        assertEq(treasuryClaimableEth1, treasuryClaimableEth2);
+    }
 
-    bondingERC20Token.buyTokens{ value: amount }(0, user);
+    function testCanSellToken() public {
+        uint256 amount = 100 ether;
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
+        bondingERC20Token.buyTokens{ value: amount }(0, user);
 
-    uint256 ethBalanceBefore = user.balance;
+        uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
 
-    bondingERC20Token.sellTokens(balanceOfBondingToken, 0);
+        uint256 ethBalanceBefore = user.balance;
 
-    uint256 ethReceived = user.balance - ethBalanceBefore;
+        bondingERC20Token.sellTokens(balanceOfBondingToken, 0);
 
-    console2.log(ethReceived);
+        uint256 ethReceived = user.balance - ethBalanceBefore;
 
-    assert(_withinRange(ethReceived, 99 ether - (0.01 * 99 ether), 1e2));
-    assert(_withinRange(bondingERC20Token.treasuryClaimableEth() + treasury.balance, 1 ether + (0.01 * 99 ether), 2));
-    assert(_withinRange(bondingERC20Token.totalEthContributed(), 0, 2));
-    assertEq(bondingERC20Token.balanceOf(user), 0);
-  }
+        console2.log(ethReceived);
 
-  function testSellTokenRevert() public {
-    uint256 amount = 100 ether;
-    vm.deal(user, amount);
-    vm.startPrank(user);
+        assert(_withinRange(ethReceived, 99 ether - (0.01 * 99 ether), 1e2));
+        assert(
+            _withinRange(bondingERC20Token.treasuryClaimableEth() + treasury.balance, 1 ether + (0.01 * 99 ether), 2)
+        );
+        assert(_withinRange(bondingERC20Token.totalEthContributed(), 0, 2));
+        assertEq(bondingERC20Token.balanceOf(user), 0);
+    }
 
-    bondingERC20Token.buyTokens{ value: amount }(0, user);
+    function testSellTokenRevert() public {
+        uint256 amount = 100 ether;
+        vm.deal(user, amount);
+        vm.startPrank(user);
 
-    uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
+        bondingERC20Token.buyTokens{ value: amount }(0, user);
 
-    // uint256 ethBalanceBefore = user.balance;
+        uint256 balanceOfBondingToken = bondingERC20Token.balanceOf(user);
 
-    vm.expectRevert();
-    bondingERC20Token.sellTokens(balanceOfBondingToken + 1, 0);
-  }
+        // uint256 ethBalanceBefore = user.balance;
 
-  function _withinRange(uint256 a, uint256 b, uint256 diff) internal pure returns (bool) {
-    return (stdMath.delta(a, b) <= diff);
-  }
+        vm.expectRevert();
+        bondingERC20Token.sellTokens(balanceOfBondingToken + 1, 0);
+    }
+
+    function _withinRange(uint256 a, uint256 b, uint256 diff) internal pure returns (bool) {
+        return (stdMath.delta(a, b) <= diff);
+    }
 }

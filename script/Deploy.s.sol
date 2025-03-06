@@ -11,36 +11,40 @@ import "forge-std/src/console.sol";
 
 /// @dev See the Solidity Scripting tutorial: https://book.getfoundry.sh/tutorials/solidity-scripting
 contract Deploy is Script {
-  address constant WETH = 0xC009a670E2B02e21E7e75AE98e254F467f7ae257; // CHANGE THIS
-  address constant UNISWAP_V3_FACTORY = 0x62B672E531f8c11391019F6fba0b8B6143504169; // CHANGE THIS
-  address constant NON_FUNGIBLE_POSITION_MANAGER = 0xC967b23826DdAB00d9AAd3702CbF5261B7Ed9a3a; // CHANGE THIS
-  IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-    IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
+    address constant WETH = 0xC009a670E2B02e21E7e75AE98e254F467f7ae257; // CHANGE THIS
+    address constant UNISWAP_V3_FACTORY = 0x62B672E531f8c11391019F6fba0b8B6143504169; // CHANGE THIS
+    address constant NON_FUNGIBLE_POSITION_MANAGER = 0xC967b23826DdAB00d9AAd3702CbF5261B7Ed9a3a; // CHANGE THIS
+    address constant UNISWAP_V3_LOCKER = 0xaacBE7601F589464cd27B09Ba87478fA1396Ed3C; // CHANGE THIS
 
-  function run() public returns (BondingERC20TokenFactory tokenFactory) {
-    vm.startBroadcast();
+    IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
+        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 1 days, pctSupply: 3 });
 
-    IBondingCurve _bondingCurve = new AMMFormula();
-    tokenFactory = new BondingERC20TokenFactory(
-      0x4dAb467dB2480422566cD57eae9624c6c273220E,
-      _bondingCurve,
-      0x4dAb467dB2480422566cD57eae9624c6c273220E,
-      0.125 ether,
-      800_000_000 ether,
-      100,
-      100,
-      0 ether, //// creation fee
-      UNISWAP_V3_FACTORY,
-      NON_FUNGIBLE_POSITION_MANAGER,
-      WETH,
-      _antiWhale
-    );
-    address token = tokenFactory.deployBondingERC20TokenAndPurchase{ value: 0.01 ether }("TestApe", "TestApe", true);
+    function run() public returns (BondingERC20TokenFactory tokenFactory) {
+        vm.startBroadcast();
 
-    console.log("factory is deployed at", address(tokenFactory));
-    console.log("token is deployed at", token);
-  }
+        IBondingCurve _bondingCurve = new AMMFormula();
+        tokenFactory = new BondingERC20TokenFactory(
+            0x4dAb467dB2480422566cD57eae9624c6c273220E,
+            _bondingCurve,
+            0x4dAb467dB2480422566cD57eae9624c6c273220E,
+            0.125 ether,
+            800_000_000 ether,
+            100,
+            100,
+            0 ether, //// creation fee
+            UNISWAP_V3_FACTORY,
+            NON_FUNGIBLE_POSITION_MANAGER,
+            UNISWAP_V3_LOCKER,
+            WETH,
+            _antiWhale
+        );
+        address token = tokenFactory.deployBondingERC20TokenAndPurchase{ value: 0.01 ether }("TestApe", "TestApe", true);
+
+        console.log("factory is deployed at", address(tokenFactory));
+        console.log("token is deployed at", token);
+    }
 }
 
 // DEPLOYMENT INSTRUCTIONS
-// forge script script/Deploy.s.sol:Deploy --broadcast --account MOAR_CANDY_DEV   --rpc-url https://curtis.rpc.caldera.xyz/http  -vvvvv
+// forge script script/Deploy.s.sol:Deploy --broadcast --account MOAR_CANDY_DEV   --rpc-url
+// https://curtis.rpc.caldera.xyz/http  -vvvvv
