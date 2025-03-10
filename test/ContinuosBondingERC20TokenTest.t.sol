@@ -181,10 +181,10 @@ contract ContinuosBondingERC20TokenTest is Test {
         assertEq(bondingERC20Token.isLpCreated(), true);
         assertLt(bondingERC20Token.getReserve(), 1000);
         (, uint256 tokenId,) = bondingERC20Token.liquidityPosition();
-        IUniswapV3Locker.LiquidityPosition memory position = (IUniswapV3Locker(uniswapV3Locker).positions(tokenId));
+        (address _owner,,,, bool isLocked) = (IUniswapV3Locker(uniswapV3Locker).positions(tokenId));
 
-        assertEq(position.isLocked, true);
-        assertEq(position.owner, address(bondingERC20Token));
+        assertEq(isLocked, true);
+        assertEq(_owner, address(bondingERC20Token));
     }
 
     function testCanBuyTokenFuzz(uint256 amount) public {

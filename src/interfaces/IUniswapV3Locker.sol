@@ -10,18 +10,30 @@ interface IUniswapV3Locker {
         bool isLocked;
     }
 
+    function positions(uint256 _tokenId)
+        external
+        view
+        returns (address owner, uint256 tokenId, address token0, address token1, bool isLocked);
+
     struct Epoch {
         uint256 amountCollected;
-        uint256 collectAt;
+        uint256 collectedAt;
     }
 
-    function collectFees(uint256 tokenId) external;
+    function epochs(
+        uint256 tokenId,
+        uint256 epochId
+    )
+        external
+        view
+        returns (uint256 amountCollected, uint256 collectedAt);
+
+    function collectFees(uint256 tokenId) external returns (uint256 amount0, uint256 amount1);
+    function collectInterval() external view returns (uint256);
     function withdrawFees(uint256 tokenId, uint256 amount, bytes calldata signature) external;
-    function positions(uint256 tokenId) external view returns (LiquidityPosition memory);
-    function epochs(uint256 tokenId, uint256 epochId) external view returns (Epoch memory);
     function claimedFees(uint256 tokenId) external view returns (uint256);
     function withdrawnFees(uint256 tokenId) external view returns (uint256);
-    function currentPeriod(uint256 tokenId) external view returns (uint256);
-    function nonces(address user) external view returns (uint256);
+    function lastEpoch(uint256 tokenId) external view returns (uint256);
+    function nonces(address user) external view returns (uint256 nonce);
     function WETH() external view returns (address);
 }
