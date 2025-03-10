@@ -156,6 +156,16 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
         uniswapV3Factory = _newUniswapV3Factory;
     }
 
+    function updateUniswapFeeTier(uint24 _newFeeTier) public onlyOwner {
+        emit UniswapFeeTierUpdated(_newFeeTier, uniswapV3FeeTier);
+        uniswapV3FeeTier = _newFeeTier;
+    }
+
+    function updateUniswapV3Locker(address _newUniswapV3Locker) public onlyOwner {
+        emit UniswapV3LockerUpdated(_newUniswapV3Locker, uniswapV3Locker);
+        uniswapV3Locker = _newUniswapV3Locker;
+    }
+
     function updateNonfungiblePositionManager(address _newNonfungiblePositionManager) public onlyOwner {
         emit NonfungiblePositionManagerUpdated(_newNonfungiblePositionManager, nonfungiblePositionManager);
         nonfungiblePositionManager = _newNonfungiblePositionManager;

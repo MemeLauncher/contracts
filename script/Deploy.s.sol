@@ -14,7 +14,7 @@ contract Deploy is Script {
     address constant WETH = 0xC009a670E2B02e21E7e75AE98e254F467f7ae257; // CHANGE THIS
     address constant UNISWAP_V3_FACTORY = 0x62B672E531f8c11391019F6fba0b8B6143504169; // CHANGE THIS
     address constant NON_FUNGIBLE_POSITION_MANAGER = 0xC967b23826DdAB00d9AAd3702CbF5261B7Ed9a3a; // CHANGE THIS
-    address constant UNISWAP_V3_LOCKER = 0x9509E2643e6e5256f42EA14c6f1995C98Ed279C8;
+    address constant UNISWAP_V3_LOCKER = 0xDF8b2aB27da9471715a41b3F35BFe4F3aB6830Cd;
     uint256 constant liquidityGoal = 2000 ether;
     IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
         IContinuousBondingERC20Token.AntiWhale({ isEnabled: false, timePeriod: 0, pctSupply: 300 });
@@ -37,7 +37,7 @@ contract Deploy is Script {
             UNISWAP_V3_LOCKER,
             WETH,
             _antiWhale,
-            3000
+            50_000
         );
         address token = tokenFactory.deployBondingERC20TokenAndPurchase{ value: 0.01 ether }("TestApe", "TestApe", true);
 

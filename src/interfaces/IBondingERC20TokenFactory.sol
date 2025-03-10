@@ -5,6 +5,8 @@ import { IBondingCurve } from "./IBondingCurve.sol";
 
 interface IBondingERC20TokenFactory {
     // Events
+    event UniswapV3LockerUpdated(address indexed newUniswapV3Locker, address indexed oldUniswapV3Locker);
+    event UniswapFeeTierUpdated(uint24 indexed newUniswapFeeTier, uint24 indexed oldUniswapFeeTier);
     event BondingCurveUpdated(address indexed newBondingCurve, address indexed oldBondingCurve);
     event AntiWhaleUpdated(bool indexed isEnabled, uint256 indexed timePeriod, uint256 indexed newPctSupply);
     event TreasuryUpdated(address indexed newTreasury, address indexed oldTreasury);
