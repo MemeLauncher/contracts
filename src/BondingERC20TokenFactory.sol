@@ -24,7 +24,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     uint256 public buyFee;
     uint256 public sellFee;
     uint256 public creationFee;
-    IContinuousBondingERC20Token.AntiWhale public antiWhale;
+    AntiWhale public antiWhale;
 
     constructor(
         address _owner,
@@ -39,7 +39,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
         address _nonfungiblePositionManager,
         address _uniswapV3Locker,
         address _WETH,
-        IContinuousBondingERC20Token.AntiWhale memory _antiWhale,
+        AntiWhale memory _antiWhale,
         uint24 _uniswapV3FeeTier
     )
         Ownable(_owner)
@@ -73,11 +73,7 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
             revert InvalidCreationFee();
         }
         ethRemaining -= creationFee;
-        IContinuousBondingERC20Token.AntiWhale memory _antiWhale = IContinuousBondingERC20Token.AntiWhale({
-            isEnabled: _isAntiWhaleFlagEnabled,
-            timePeriod: antiWhale.timePeriod,
-            pctSupply: antiWhale.pctSupply
-        });
+
         ContinuosBondingERC20Token _bondingERC20Token = new ContinuosBondingERC20Token(
             address(this),
             _name,
@@ -91,8 +87,8 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
             uniswapV3Factory,
             nonfungiblePositionManager,
             WETH,
-            _antiWhale,
-            uniswapV3FeeTier
+            uniswapV3FeeTier,
+            _isAntiWhaleFlagEnabled
         );
         emit TokenDeployed(address(_bondingERC20Token), msg.sender);
 
@@ -111,8 +107,8 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
         }
     }
 
-    function updateAntiWhale(IContinuousBondingERC20Token.AntiWhale memory _newAntiWhale) public onlyOwner {
-        emit AntiWhaleUpdated(_newAntiWhale.isEnabled, _newAntiWhale.timePeriod, _newAntiWhale.pctSupply);
+    function updateAntiWhale(AntiWhale memory _newAntiWhale) public onlyOwner {
+        emit AntiWhaleUpdated(_newAntiWhale.timePeriod, _newAntiWhale.pctSupply);
         antiWhale = _newAntiWhale;
     }
 

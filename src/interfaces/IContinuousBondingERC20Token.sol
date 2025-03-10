@@ -5,12 +5,6 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBondingCurve } from "./IBondingCurve.sol";
 
 interface IContinuousBondingERC20Token is IERC20 {
-    struct AntiWhale {
-        bool isEnabled;
-        uint256 timePeriod;
-        uint256 pctSupply;
-    }
-
     struct LiquidityPosition {
         bool isCreated;
         uint256 tokenId;
@@ -28,8 +22,6 @@ interface IContinuousBondingERC20Token is IERC20 {
     function totalEthContributed() external returns (uint256);
 
     function isLpCreated() external returns (bool);
-
-    function antiWhale() external view returns (bool isEnabled, uint256 timePeriod, uint256 pctSupply);
 
     function liquidityPosition() external view returns (bool isCreated, uint256 tokenId, uint24 feeTier);
 

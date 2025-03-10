@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import { BondingERC20TokenFactory } from "../src/BondingERC20TokenFactory.sol";
 import { AMMFormula } from "../src/utils/AMMFormula.sol";
 import { IBondingCurve } from "../src/interfaces/IBondingCurve.sol";
+import { IBondingERC20TokenFactory } from "../src/interfaces/IBondingERC20TokenFactory.sol";
 import { IContinuousBondingERC20Token } from "../src/interfaces/IContinuousBondingERC20Token.sol";
 import { Script } from "forge-std/src/Script.sol";
 
@@ -16,8 +17,8 @@ contract Deploy is Script {
     address constant NON_FUNGIBLE_POSITION_MANAGER = 0xC967b23826DdAB00d9AAd3702CbF5261B7Ed9a3a; // CHANGE THIS
     address constant UNISWAP_V3_LOCKER = 0xDF8b2aB27da9471715a41b3F35BFe4F3aB6830Cd;
     uint256 constant liquidityGoal = 2000 ether;
-    IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-        IContinuousBondingERC20Token.AntiWhale({ isEnabled: false, timePeriod: 0, pctSupply: 300 });
+    IBondingERC20TokenFactory.AntiWhale internal _antiWhale =
+        IBondingERC20TokenFactory.AntiWhale({ timePeriod: 0, pctSupply: 300 });
 
     function run() public returns (BondingERC20TokenFactory tokenFactory) {
         vm.startBroadcast();

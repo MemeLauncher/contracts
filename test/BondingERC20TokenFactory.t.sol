@@ -7,6 +7,7 @@ import { console2 } from "forge-std/src/console2.sol";
 import { BondingERC20TokenFactory } from "src/BondingERC20TokenFactory.sol";
 import { IBondingCurve } from "src/interfaces/IBondingCurve.sol";
 import { IContinuousBondingERC20Token } from "src/interfaces/IContinuousBondingERC20Token.sol";
+import { IBondingERC20TokenFactory } from "src/interfaces/IBondingERC20TokenFactory.sol";
 import { AMMFormula } from "src/utils/AMMFormula.sol";
 
 contract BondingERC20TokenFactoryTest is Test {
@@ -24,8 +25,8 @@ contract BondingERC20TokenFactoryTest is Test {
     address internal uniswapV3Factory = makeAddr("uniswapV3Factory");
     address internal nonfungiblePositionManager = makeAddr("nonfungiblePositionManager");
     address internal WETH = makeAddr("WETH");
-    IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 0, pctSupply: 300 });
+    IBondingERC20TokenFactory.AntiWhale internal _antiWhale =
+        IBondingERC20TokenFactory.AntiWhale({ timePeriod: 0, pctSupply: 300 });
 
     function setUp() public {
         uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 58_153_914);

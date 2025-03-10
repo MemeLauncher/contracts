@@ -11,6 +11,7 @@ import { ContinuosBondingERC20Token } from "src/ContinuosBondingERC20Token.sol";
 import { IContinuousBondingERC20Token } from "src/interfaces/IContinuousBondingERC20Token.sol";
 import { IBondingCurve } from "src/interfaces/IBondingCurve.sol";
 import { AMMFormula } from "src/utils/AMMFormula.sol";
+import { IBondingERC20TokenFactory } from "src/interfaces/IBondingERC20TokenFactory.sol";
 
 contract ContinuosBondingERC20TokenTest is Test {
     address internal treasury = makeAddr("treasury");
@@ -34,8 +35,8 @@ contract ContinuosBondingERC20TokenTest is Test {
     BondingERC20TokenFactory internal factory;
     IBondingCurve internal bondingCurve;
     ContinuosBondingERC20Token internal bondingERC20Token;
-    IContinuousBondingERC20Token.AntiWhale internal _antiWhale =
-        IContinuousBondingERC20Token.AntiWhale({ isEnabled: true, timePeriod: 0, pctSupply: 300 });
+    IBondingERC20TokenFactory.AntiWhale internal _antiWhale =
+        IBondingERC20TokenFactory.AntiWhale({ timePeriod: 0, pctSupply: 300 });
 
     function setUp() public {
         uint256 forkId = vm.createFork(vm.envString("AVAX_MAINNET_RPC_URL"), 58_153_914);

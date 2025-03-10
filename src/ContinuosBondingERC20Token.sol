@@ -39,7 +39,6 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
 
-    AntiWhale public antiWhale;
     LiquidityPosition public liquidityPosition;
 
     IBondingCurve public immutable bondingCurve;
@@ -52,7 +51,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     uint256 public buyFee;
     uint256 public sellFee;
     uint256 public treasuryClaimableEth;
-
+    bool public isAntiWhaleFlagEnabled;
     uint256 public creationTime;
 
     IUniswapV3Factory public immutable uniswapV3Factory;
@@ -72,8 +71,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         address _uniswapV3Factory,
         address _nonfungiblePositionManager,
         address _WETH,
-        AntiWhale memory _antiWhaleProps,
-        uint24 _lpFeeTier
+        uint24 _lpFeeTier,
+        bool _isAntiWhaleFlagEnabled
     )
         ERC20(_name, _symbol)
     {
@@ -90,7 +89,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         nonfungiblePositionManager = INonfungiblePositionManager(_nonfungiblePositionManager);
         WETH = _WETH;
         creationTime = block.timestamp;
-        antiWhale = _antiWhaleProps;
+        isAntiWhaleFlagEnabled = _isAntiWhaleFlagEnabled;
         liquidityPosition = LiquidityPosition({ isCreated: false, tokenId: 0, feeTier: _lpFeeTier });
     }
 
@@ -124,12 +123,14 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
         _transfer(address(this), recipient, tokensToReceive);
-        if (
-            balanceOf(recipient) > ((antiWhale.pctSupply * MAX_TOTAL_SUPPLY) / PERCENTAGE_DENOMINATOR)
-                && antiWhale.isEnabled
-                && (antiWhale.timePeriod == 0 || (block.timestamp - creationTime) < antiWhale.timePeriod)
-        ) {
-            revert AntiWhaleFeatureEnabled();
+        if (isAntiWhaleFlagEnabled) {
+            (uint256 timePeriod, uint256 pctSupply) = IBondingERC20TokenFactory(factory).antiWhale();
+            if (
+                balanceOf(recipient) > ((pctSupply * MAX_TOTAL_SUPPLY) / PERCENTAGE_DENOMINATOR)
+                    && (timePeriod == 0 || (block.timestamp - creationTime) < timePeriod)
+            ) {
+                revert AntiWhaleFeatureEnabled();
+            }
         }
 
         if (liquidityGoalReached()) {
@@ -210,10 +211,6 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
 
     function isLpCreated() external view returns (bool) {
         return liquidityPosition.isCreated;
-    }
-
-    function isAntiWhaleFlagEnabled() public view returns (bool) {
-        return antiWhale.isEnabled;
     }
 
     function claimTreasuryBalance(address to, uint256 amount) public {

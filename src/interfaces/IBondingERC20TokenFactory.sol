@@ -8,7 +8,7 @@ interface IBondingERC20TokenFactory {
     event UniswapV3LockerUpdated(address indexed newUniswapV3Locker, address indexed oldUniswapV3Locker);
     event UniswapFeeTierUpdated(uint24 indexed newUniswapFeeTier, uint24 indexed oldUniswapFeeTier);
     event BondingCurveUpdated(address indexed newBondingCurve, address indexed oldBondingCurve);
-    event AntiWhaleUpdated(bool indexed isEnabled, uint256 indexed timePeriod, uint256 indexed newPctSupply);
+    event AntiWhaleUpdated(uint256 indexed timePeriod, uint256 indexed newPctSupply);
     event TreasuryUpdated(address indexed newTreasury, address indexed oldTreasury);
     event AvailableTokenUpdated(uint256 indexed newAvailableToken, uint256 indexed oldAvailableToken);
     event InitialTokenBalanceUpdated(uint256 indexed newInitialTokenBalance, uint256 indexed oldInitialTokenBalance);
@@ -22,6 +22,13 @@ interface IBondingERC20TokenFactory {
     event FeeRecipientUpdated(address indexed newFeeRecipient, address indexed oldFeeRecipient);
     event CreationFeeUpdated(uint256 indexed newCreationFee, uint256 indexed oldCreationFee);
     event FeesSent(uint256 fees);
+
+    struct AntiWhale {
+        uint256 timePeriod;
+        uint256 pctSupply;
+    }
+
+    function antiWhale() external view returns (uint256 timePeriod, uint256 pctSupply);
 
     // Public view functions
     function bondingCurve() external view returns (IBondingCurve);
