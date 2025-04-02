@@ -43,8 +43,6 @@ interface IBondingERC20TokenFactory {
 
     function nonfungiblePositionManager() external view returns (address);
 
-    function feeRecipient() external view returns (address);
-
     function initialTokenBalance() external view returns (uint256);
 
     function availableTokenBalance() external view returns (uint256);
@@ -76,8 +74,8 @@ interface IBondingERC20TokenFactory {
     function updateBondingCurve(IBondingCurve _newBondingCurve) external;
 
     function updateUniswapV3Factory(address _newUniswapV3Factory) external;
+    function updateUniswapV3Locker(address _newUniswapV3Locker) external;
+    function updateCreationFee(uint256 newCreationFee) external;
 
     function updateNonfungiblePositionManager(address _newNonfungiblePositionManager) external;
-
-    function updateFeeRecipient(address _newFeeRecipient) external;
 }

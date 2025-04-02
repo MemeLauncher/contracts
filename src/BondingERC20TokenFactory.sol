@@ -18,7 +18,6 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     address public uniswapV3Locker;
     uint24 public uniswapV3FeeTier;
     address public nonfungiblePositionManager;
-    address public feeRecipient;
     uint256 public initialTokenBalance;
     uint256 public availableTokenBalance;
     uint256 public buyFee;
@@ -165,10 +164,5 @@ contract BondingERC20TokenFactory is IBondingERC20TokenFactory, Ownable {
     function updateNonfungiblePositionManager(address _newNonfungiblePositionManager) public onlyOwner {
         emit NonfungiblePositionManagerUpdated(_newNonfungiblePositionManager, nonfungiblePositionManager);
         nonfungiblePositionManager = _newNonfungiblePositionManager;
-    }
-
-    function updateFeeRecipient(address _newFeeRecipient) public onlyOwner {
-        emit FeeRecipientUpdated(_newFeeRecipient, feeRecipient);
-        feeRecipient = _newFeeRecipient;
     }
 }
