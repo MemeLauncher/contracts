@@ -5,20 +5,27 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IBondingCurve } from "./IBondingCurve.sol";
 
 interface IContinuousBondingERC20Token is IERC20 {
-  function bondingCurve() external returns (IBondingCurve);
+    struct LiquidityPosition {
+        bool isCreated;
+        uint256 tokenId;
+        uint24 feeTier;
+    }
 
-  function TREASURY_ADDRESS() external returns (address);
+    function bondingCurve() external returns (IBondingCurve);
 
-  function availableTokenBalance() external returns (uint256);
+    function TREASURY_ADDRESS() external returns (address);
 
-  function initialTokenBalance() external returns (uint256);
+    function availableTokenBalance() external returns (uint256);
 
-  function totalEthContributed() external returns (uint256);
+    function initialTokenBalance() external returns (uint256);
 
-  function isLpCreated() external returns (bool);
+    function totalEthContributed() external returns (uint256);
 
-  function isAntiWhaleFlagEnabled() external view returns (bool);
+    function isLpCreated() external returns (bool);
 
-  function buyTokens(uint256 minExpectedAmount, address recipient) external payable returns (uint256);
+    function liquidityPosition() external view returns (bool isCreated, uint256 tokenId, uint24 feeTier);
 
+    function isAntiWhaleFlagEnabled() external view returns (bool);
+
+    function buyTokens(uint256 minExpectedAmount, address recipient) external payable returns (uint256);
 }

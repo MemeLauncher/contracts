@@ -38,8 +38,8 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     uint256 public constant PERCENTAGE_DENOMINATOR = 10_000; // 100%
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
     uint256 public constant MAX_TOTAL_SUPPLY = 1_000_000_000 * 10 ** 18;
-    uint256 public constant ANTI_WHALE_TIME_PERIOD = 1 days;
-    uint256 public immutable ANTI_WHALE_MAX_TOKEN;
+
+    LiquidityPosition public liquidityPosition;
 
     IBondingCurve public immutable bondingCurve;
     address public immutable TREASURY_ADDRESS;
@@ -51,7 +51,6 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     uint256 public buyFee;
     uint256 public sellFee;
     uint256 public treasuryClaimableEth;
-    bool public isLpCreated;
     bool public isAntiWhaleFlagEnabled;
     uint256 public creationTime;
 
@@ -72,6 +71,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         address _uniswapV3Factory,
         address _nonfungiblePositionManager,
         address _WETH,
+        uint24 _lpFeeTier,
         bool _isAntiWhaleFlagEnabled
     )
         ERC20(_name, _symbol)
@@ -88,13 +88,13 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         uniswapV3Factory = IUniswapV3Factory(_uniswapV3Factory);
         nonfungiblePositionManager = INonfungiblePositionManager(_nonfungiblePositionManager);
         WETH = _WETH;
-        isAntiWhaleFlagEnabled = _isAntiWhaleFlagEnabled;
         creationTime = block.timestamp;
-        ANTI_WHALE_MAX_TOKEN = 3 * MAX_TOTAL_SUPPLY / 100;
+        isAntiWhaleFlagEnabled = _isAntiWhaleFlagEnabled;
+        liquidityPosition = LiquidityPosition({ isCreated: false, tokenId: 0, feeTier: _lpFeeTier });
     }
 
     function buyTokens(uint256 minExpectedAmount, address recipient) external payable nonReentrant returns (uint256) {
-        if (liquidityGoalReached() || isLpCreated) revert LiquidityGoalReached();
+        if (liquidityGoalReached() || liquidityPosition.isCreated) revert LiquidityGoalReached();
         if (msg.value == 0) revert NeedToSendETH();
 
         uint256 ethAmount = msg.value;
@@ -123,8 +123,14 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         if (tokensToReceive < minExpectedAmount) revert InSufficientAmountReceived();
 
         _transfer(address(this), recipient, tokensToReceive);
-        if (isAntiWhaleFlagEnabled && block.timestamp - creationTime < ANTI_WHALE_TIME_PERIOD && balanceOf(recipient) > ANTI_WHALE_MAX_TOKEN) {
-            revert AntiWhaleFeatureEnabled();
+        if (isAntiWhaleFlagEnabled) {
+            (uint256 timePeriod, uint256 pctSupply) = IBondingERC20TokenFactory(factory).antiWhale();
+            if (
+                balanceOf(recipient) > ((pctSupply * MAX_TOTAL_SUPPLY) / PERCENTAGE_DENOMINATOR)
+                    && (timePeriod == 0 || (block.timestamp - creationTime) < timePeriod)
+            ) {
+                revert AntiWhaleFeatureEnabled();
+            }
         }
 
         if (liquidityGoalReached()) {
@@ -150,7 +156,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     }
 
     function sellTokens(uint256 tokenAmount, uint256 minExpectedEth) external nonReentrant {
-        if (liquidityGoalReached() || isLpCreated) revert LiquidityGoalReached();
+        if (liquidityGoalReached() || liquidityPosition.isCreated) revert LiquidityGoalReached();
         if (tokenAmount == 0) revert NeedToSellTokens();
 
         uint256 tokenReserveBalance = getReserve();
@@ -203,6 +209,10 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         return bondingCurve.calculateSaleReturn(tokenAmount, tokenReserveBalance, ethBalance, bytes(""));
     }
 
+    function isLpCreated() external view returns (bool) {
+        return liquidityPosition.isCreated;
+    }
+
     function claimTreasuryBalance(address to, uint256 amount) public {
         if (msg.sender != TREASURY_ADDRESS) {
             revert InvalidSender();
@@ -219,14 +229,13 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         uint256 currentTokenBalance = getReserve();
         uint256 currentEth = ethBalance - initialTokenBalance;
         currentEth = currentEth > address(this).balance ? address(this).balance : currentEth;
-        isLpCreated = true;
 
         // Create the pool if it doesn't exist
         (address token0, address token1) = address(this) < WETH ? (address(this), WETH) : (WETH, address(this));
         (uint256 amountOfToken0, uint256 amountOfToken1) =
             (token0 == address(this)) ? (currentTokenBalance, currentEth) : (currentEth, currentTokenBalance);
         address pool = nonfungiblePositionManager.createAndInitializePoolIfNecessary(
-            token0, token1, 3000, _getSqrtPriceX96(amountOfToken0, amountOfToken1)
+            token0, token1, liquidityPosition.feeTier, _getSqrtPriceX96(amountOfToken0, amountOfToken1)
         );
         int24 tickSpacing = IUniswapV3Pool(pool).tickSpacing();
 
@@ -235,32 +244,34 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
         IWETH(WETH).deposit{ value: currentEth }();
         IWETH(WETH).approve(address(nonfungiblePositionManager), currentEth);
 
-        address feeRecipient = IBondingERC20TokenFactory(factory).feeRecipient();
-
-        int24 tickLower = -887272;
+        int24 tickLower = -887_272;
         int24 tickUpper = -tickLower;
 
-        tickLower=-(-tickLower/tickSpacing*tickSpacing);
-        tickUpper=tickUpper/tickSpacing*tickSpacing;
+        tickLower = -(-tickLower / tickSpacing * tickSpacing);
+        tickUpper = tickUpper / tickSpacing * tickSpacing;
 
         // Add liquidity
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
             token1: token1,
-            fee: 3000,
+            fee: liquidityPosition.feeTier,
             tickLower: tickLower,
             tickUpper: tickUpper,
             amount0Desired: amountOfToken0,
             amount1Desired: amountOfToken1,
             amount0Min: 0,
             amount1Min: 0,
-            recipient: feeRecipient != address(0)
-                ? feeRecipient
-                : address(this),
+            recipient: address(this),
             deadline: block.timestamp
         });
 
         (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = nonfungiblePositionManager.mint(params);
+        nonfungiblePositionManager.safeTransferFrom(
+            address(this), IBondingERC20TokenFactory(factory).uniswapV3Locker(), tokenId
+        );
+        LiquidityPosition memory newPosition =
+            LiquidityPosition({ isCreated: true, tokenId: tokenId, feeTier: liquidityPosition.feeTier });
+        liquidityPosition = newPosition;
 
         emit PairCreated(amount1, amount0, liquidity, pool);
     }
@@ -268,7 +279,7 @@ contract ContinuosBondingERC20Token is IContinuousBondingERC20Token, ERC20, Reen
     function _update(address from, address to, uint256 value) internal virtual override {
         if (
             !liquidityGoalReached() && from != address(0) && to != address(0) && from != address(this)
-                && to != address(this) && !isLpCreated
+                && to != address(this) && !liquidityPosition.isCreated
         ) {
             (address token0, address token1) = address(this) < WETH ? (address(this), WETH) : (WETH, address(this));
             address pool = IUniswapV3Factory(uniswapV3Factory).getPool(token0, token1, 3000);
